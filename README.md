@@ -23,7 +23,10 @@ Tested with MATLAB R2018b.
     * :construction: AxoGraph or AxographX datafile
 * Organize a series of current vs. time sweeps by splitting them into groups.
     * Group interleaved sweeps.
+    * :construction: Group blocks of sweeps.
+    * :construction: Manually group arbitrary sweeps.
     * Optionally show average of sweeps in each group.
+    * :construction: Optionally overlay all groups in a single plot.
 * Visually step through a group of sweeps.
     * Optionally show only the selected sweep(s).
     * Optionally show all sweeps with selected sweep(s) highlighted.
