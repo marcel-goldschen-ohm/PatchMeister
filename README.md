@@ -16,24 +16,24 @@ Everything is in patch_meister.m
 Tested with MATLAB R2018b.
 
 ### Capabilites
-* Import data.
+* *Import data.*
     * HEKA PatchMaster MATLAB export (assumes all traces belong to the same patch and experiment).
     * :construction: HEKA PatchMaster datafile
     * :construction: Molecular Devices pCLAMP datafile
     * :construction: AxoGraph or AxographX datafile
-* Organize a series of current vs. time sweeps by splitting them into groups.
+* *Organize a series of current vs. time sweeps by splitting them into groups.*
     * Group interleaved sweeps.
     * :construction: Group blocks of sweeps.
     * :construction: Manually group arbitrary sweeps.
     * Optionally show average of sweeps in each group.
     * :construction: Optionally overlay all groups in a single plot.
-* Visually step through a group of sweeps.
+* *Visually step through a group of sweeps.*
     * Optionally show only the selected sweep(s).
     * Optionally show all sweeps with selected sweep(s) highlighted.
-* Mask selected sweeps to remove them from analysis (e.g. average).
+* *Mask selected sweeps to remove them from analysis (e.g. average).*
    * Masked sweeps are flagged, but NOT deleted.
    * Optionally show or hide masked sweeps.
-* Basic manipulation of sweep data.
+* *Basic manipulation of sweep data.*
     * Sweep manipulations are stored as offsets and scale factors (original data is NOT directly altered).
     * Manipulations can be applied to one or any number of sweeps simultaneously by selecting appropriate data regions in each of the desired sweeps using MATLAB's brush tool. How the selected data points are used depends on the manipulation.
     * **Baseline one region (flat)** - Baseline Y data to mean of selected data points.
