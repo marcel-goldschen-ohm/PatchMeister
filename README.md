@@ -28,6 +28,7 @@ Tested with MATLAB R2018b.
     * Optionally show average of sweeps in each group.
     * :construction: Optionally overlay all groups in a single plot.
 * *Visually step through a group of sweeps.*
+    * Buttons to step forward/backward through a group of sweeps.
     * Optionally show only the selected sweep(s).
     * Optionally show all sweeps with selected sweep(s) highlighted.
 * *Mask selected sweeps to remove them from analysis (e.g. average).*
