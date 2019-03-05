@@ -8,7 +8,6 @@ PatchMeister is...
 * currently primarily for ensemble current measurements, NOT for single-channel analysis.
 * easily extended for custom analyses (it's all just MATLAB code).
 
-### Author
 Copyright 2019 by Marcel Goldschen-Ohm <goldschen-ohm@utexas.edu>
 
 ---
