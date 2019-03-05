@@ -11,9 +11,11 @@ PatchMeister is...
 ### Author
 Copyright 2019 by Marcel Goldschen-Ohm <goldschen-ohm@utexas.edu>
 
+---
 ### Install
 Everything is in patch_meister.m
 
+---
 ### Capabilites
 * Import data.
     * HEKA MATLAB export (assumes all traces belong to the same patch and experiment).
