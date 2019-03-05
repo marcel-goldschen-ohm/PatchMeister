@@ -6,7 +6,7 @@ PatchMeister is...
 * for analysis ONLY, it does NOT have the capability to aquire data from a digitizer/amplifier. 
 * currently a basic but highly useful analysis tool for analyzing series of current vs. time sweeps.
 * currently primarily for ensemble current measurements, NOT for single-channel analysis.
-* easily extended for custom analyses (it's all just MATLAB code).
+* easily extended for custom analyses (it's all just [MATLAB](http://www.mathworks.com/products/matlab) code).
 
 Copyright 2019 by Marcel Goldschen-Ohm <goldschen-ohm@utexas.edu>
 
@@ -17,9 +17,9 @@ Tested with MATLAB R2018b.
 
 ### Capabilites
 * Import data.
-    * HEKA MATLAB export (assumes all traces belong to the same patch and experiment).
+    * HEKA PatchMaster MATLAB export (assumes all traces belong to the same patch and experiment).
     * :construction: HEKA PatchMaster datafile
-    * :construction: pCLAMP datafile
+    * :construction: Molecular Devices pCLAMP datafile
     * :construction: AxoGraph or AxographX datafile
 * Organize a series of current vs. time sweeps by splitting them into groups.
     * Group interleaved sweeps.
