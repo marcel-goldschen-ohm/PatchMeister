@@ -56,11 +56,6 @@ initUi();
 set(ui.mainWindow, 'KeyPressFcn', @keyPress);
 set(ui.mainWindow, 'SizeChangedFcn', @resizeUi);
 
-%% user init
-loadData(0, 0, '/Users/marcel/Box Sync/Goldschen-Ohm Lab/People/Wagner Nors/data/rGABAAR a1b2g2/2019-01-17 55-61 500ms 10 mM GABA/2019-01-17_GABA_WT_PATCH_000 - 55-61.mat');
-data.traces(end).ismasked = true;
-groupInterleavedTraces(0, 0, 2);
-
 %% UI
 function initUi()
     ui.mainWindow = figure( ...
