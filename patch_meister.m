@@ -48,21 +48,22 @@ template.data.units = {'sec', 'pA'};
 template.data.groupnames = {};
 
 data = template.data;
-olddata = data;
+olddata = data; % copy of data for undoing last operation
+
 ui = struct();
 initUi();
-% mgr = uigetmodemanager(ui.mainWindow);
-% [mgr.WindowListenerHandles.Enabled] = deal(false);
 set(ui.mainWindow, 'KeyPressFcn', @keyPress);
 set(ui.mainWindow, 'SizeChangedFcn', @resizeUi);
+
+%% user init
+
 
 %% UI
 function initUi()
     ui.mainWindow = figure( ...
         'Name', 'Patch Meister', ...
-        ... %'Toolbar', 'none', ...
         'Units', 'normalized', ...
-        'Position', [0 0.4 1 0.6]);
+        'Position', [0 0 1 1]);
     ui.mainWindow.Units = 'pixels';
     
     ui.menu = uimenu(ui.mainWindow, ...
@@ -94,27 +95,27 @@ function initUi()
         'Text', 'Align To Onset', ...
         'MenuSelectedFcn', @alignToOnset);
     
-    ui.showTraces = true;
     ui.showTracesBtn = uimenu(ui.menu, ...
         'Separator', 'on', ...
         'Text', 'Show Traces', ...
         'Checked', 'on', ...
-        'MenuSelectedFcn', @toggleShowTraces);
-    ui.showMaskedTraces = true;
+        'MenuSelectedFcn', @toggleBtnCheckedOption);
     ui.showMaskedTracesBtn = uimenu(ui.menu, ...
         'Text', 'Show Masked Traces', ...
         'Checked', 'on', ...
-        'MenuSelectedFcn', @toggleShowMaskedTraces);
-    ui.showAverageTrace = false;
+        'MenuSelectedFcn', @toggleBtnCheckedOption);
+    ui.showSelectedTracesOnlyBtn = uimenu(ui.menu, ...
+        'Text', 'Show Selected Traces Only', ...
+        'Checked', 'off', ...
+        'MenuSelectedFcn', @toggleBtnCheckedOption);
     ui.showAverageTraceBtn = uimenu(ui.menu, ...
         'Text', 'Show Average Trace', ...
         'Checked', 'off', ...
-        'MenuSelectedFcn', @toggleShowAverageTrace);
-    ui.overlayGroups = false;
+        'MenuSelectedFcn', @toggleBtnCheckedOption);
     ui.overlayGroupsBtn = uimenu(ui.menu, ...
         'Text', 'Overlay Groups', ...
         'Checked', 'off', ...
-        'MenuSelectedFcn', @toggleOverlayGroups);
+        'MenuSelectedFcn', @toggleBtnCheckedOption);
     
     uimenu(ui.menu, ...
         'Separator', 'on', ...
@@ -124,255 +125,50 @@ function initUi()
         'Text', 'Group Interleaved', ...
         'MenuSelectedFcn', @groupInterleavedTraces);
     
-%     ui.groupMenuItems = [uimenu(ui.menu, ...
-%         'Separator', 'on', ...
-%         'UserData', 1, ...
-%         'Text', 'Group 1', ...
-%         'Checked', 'on', ...
-%         'MenuSelectedFcn', @selectGroup)];
-%     ui.groupid = 1;
-    
     ax = axes('Parent', ui.mainWindow, ...
         'Units', 'pixels', ...
+        'XLimMode', 'auto', ...
+        'YLimMode', 'auto', ...
         'UserData', 1);
     plot(ax, 0, 0);
     ui.plots = [ax];
     ui.traces = gobjects(0);
-    ui.hitraces = [];
+    ui.visibleTraces = [];
+    ui.selectedTraces = [];
     ui.plotcontrols = [getPlotControls()];
     ui.plotcontrols(end).panel.UserData = 1;
+    
+    ui.autoscaleXBtn = uicontrol(ui.mainWindow, ...
+        'Style', 'pushbutton', ...
+        'String', 'autoX', ...
+        'Units', 'pixels', ...
+        'Position', [10, 10, 50, 16], ...
+        'CallBack', @(src, event) autoscalePlots(src, event, 'x'));
+    ui.autoscaleYBtn = uicontrol(ui.mainWindow, ...
+        'Style', 'pushbutton', ...
+        'String', 'autoY', ...
+        'Units', 'pixels', ...
+        'Position', [60, 10, 50, 16], ...
+        'CallBack', @(src, event) autoscalePlots(src, event, 'y'));
+    ui.autoscaleXYBtn = uicontrol(ui.mainWindow, ...
+        'Style', 'pushbutton', ...
+        'String', 'autoXY', ...
+        'Units', 'pixels', ...
+        'Position', [110, 10, 50, 16], ...
+        'CallBack', @autoscalePlots);
     
     resizeUi();
 end
 
-function controls = getPlotControls()
-    lh = 16;
-    bh = 40;
-    w = 150;
-    h = 10 + 3 * lh + bh;
-    controls.panel = uipanel(ui.mainWindow, ...
-        'Units', 'pixels', ...
-        'Position', [0, 0, w, h]);
-    t = h - 5;
-    w = w - 10;
-    controls.groupNameEdit = uicontrol(controls.panel, ...
-        'Style', 'edit', ...
-        'Units', 'pixels', ...
-        'Position', [5 t-lh, w, lh], ...
-        'CallBack', @groupNameEdited);
-    t = t - lh;
-    controls.visibleTracesEdit = uicontrol(controls.panel, ...
-        'Style', 'edit', ...
-        'Units', 'pixels', ...
-        'Position', [5, t-lh, 70, lh], ...
-        'CallBack', @selectedTracesEdited);
-    controls.numTracesText = uicontrol(controls.panel, ...
-        'Style', 'text', ...
-        'String', '/0', ...
-        'HorizontalAlignment', 'left', ...
-        'Units', 'pixels', ...
-        'Position', [75, t-lh, 35, lh]);
-    controls.showAllTracesBtn = uicontrol(controls.panel, ...
-        'Style', 'pushbutton', ...
-        'String', 'All', ...
-        'Units', 'pixels', ...
-        'Position', [110, t-lh, 35, lh], ...
-        'CallBack', @allTraces);
-    t = t - lh;
-    controls.firstTraceBtn = uicontrol(controls.panel, ...
-        'Style', 'pushbutton', ...
-        'String', '<<', ...
-        'Units', 'pixels', ...
-        'Position', [5, t-bh, 20, bh], ...
-        'CallBack', @firstTrace);
-    controls.prevTraceBtn = uicontrol(controls.panel, ...
-        'Style', 'pushbutton', ...
-        'String', '<', ...
-        'Units', 'pixels', ...
-        'Position', [25, t-bh, 50, bh], ...
-        'CallBack', @prevTrace);
-    controls.nextTraceBtn = uicontrol(controls.panel, ...
-        'Style', 'pushbutton', ...
-        'String', '>', ...
-        'Units', 'pixels', ...
-        'Position', [75, t-bh, 50, bh], ...
-        'CallBack', @nextTrace);
-    controls.lastTraceBtn = uicontrol(controls.panel, ...
-        'Style', 'pushbutton', ...
-        'String', '>>', ...
-        'Units', 'pixels', ...
-        'Position', [125, t-bh, 20, bh], ...
-        'CallBack', @lastTrace);
-    t = t - bh;
-    controls.maskTraceCheckBox = uicontrol(controls.panel, ...
-        'Style', 'checkbox', ...
-        'String', 'Masked', ...
-        'Units', 'pixels', ...
-        'Position', [5, t-lh, w, lh], ...
-        'CallBack', @toggleMaskTrace);
-    t = t - lh;
-end
-
-function groupNameEdited(src, event)
-    groupid = src.Parent.UserData;
-    data.groupnames{groupid} = src.String;
-    if isempty(src.String)
-        src.String = ['Group ' num2str(groupid)];
-    end
-end
-
-function selectedTracesEdited(src, event)
-    groupid = src.Parent.UserData;
-    gidx = find(vertcat(data.traces.groupid) == groupid);
-    idx = str2idx(src.String);
-    ui.hitraces(gidx) = false;
-    idx(find(idx < 1)) = [];
-    idx(find(idx > numel(gidx))) = [];
-    if numel(idx) < numel(gidx) && numel(idx) > 0
-        ui.hitraces(gidx(idx)) = true;
-    end
-    redraw();
-end
-
-function idx = str2idx(str)
-    idx = [];
-    fields = split(string(str), [",", " "]);
-    for i = 1:numel(fields)
-        field = strtrim(fields{i});
-        if ~isempty(field)
-            if ~isempty(strfind(field, "-"))
-                subfields = split(field, "-");
-                if numel(subfields) == 2
-                    first = str2num(subfields{1});
-                    last = str2num(subfields{2});
-                    for j = first:last
-                        idx = [idx, j];
-                    end
-                end
-            else
-                idx = [idx, str2num(field)];
-            end
-        end
-    end
-    idx = unique(idx);
-end
-
-function str = idx2str(idx)
-    idx = unique(idx);
-    strs = [];
-    a = [];
-    for i = 1:numel(idx)
-        if isempty(a) || idx(i) == a(end) + 1
-            a = [a, idx(i)];
-        else
-            if numel(a) == 1
-                strs = [strs, num2str(a(1))];
-            else
-                strs = [strs, num2str(a(1)) + "-" + num2str(a(end))];
-            end
-        end
-    end
-    str = join(strs, ",");
-end
-
-function prevTrace(src, event)
-    groupid = src.Parent.UserData;
-    gidx = find(vertcat(data.traces.groupid) == groupid);
-    if ~ui.showMaskedTraces
-        masked = vertcat(data.traces(gidx).ismasked);
-        idx = gidx(find(~masked));
+function toggleBtnCheckedOption(src, event)
+    if strcmp(src.Checked, 'on')
+        src.Checked = 'off';
     else
-        idx = gidx;
+        src.Checked = 'on';
     end
-    if isempty(idx); return; end
-    hdx = find(ui.hitraces(idx));
-    ui.hitraces(gidx) = false;
-    if isempty(hdx)
-        idx = idx(end);
-    elseif hdx(1) == 1
-        idx = idx(1);
+    if isequal(src, ui.overlayGroupsBtn)
+        disp('overlay');
     else
-        idx = idx(hdx(1) - 1);
-    end
-    ui.hitraces(idx) = true;
-    redraw();
-end
-
-function nextTrace(src, event)
-    groupid = src.Parent.UserData;
-    gidx = find(vertcat(data.traces.groupid) == groupid);
-    if ~ui.showMaskedTraces
-        masked = vertcat(data.traces(gidx).ismasked);
-        idx = gidx(find(~masked));
-    else
-        idx = gidx;
-    end
-    if isempty(idx); return; end
-    hdx = find(ui.hitraces(idx));
-    ui.hitraces(gidx) = false;
-    if isempty(hdx)
-        idx = idx(1);
-    elseif hdx(end) == numel(idx)
-        idx = idx(end);
-    else
-        idx = idx(hdx(end) + 1);
-    end
-    ui.hitraces(idx) = true;
-    redraw();
-end
-
-function firstTrace(src, event)
-    groupid = src.Parent.UserData;
-    gidx = find(vertcat(data.traces.groupid) == groupid);
-    if ~ui.showMaskedTraces
-        masked = vertcat(data.traces(gidx).ismasked);
-        idx = gidx(find(~masked));
-    else
-        idx = gidx;
-    end
-    if isempty(idx); return; end
-    ui.hitraces(gidx) = false;
-    ui.hitraces(idx(1)) = true;
-    redraw();
-end
-
-function lastTrace(src, event)
-    groupid = src.Parent.UserData;
-    gidx = find(vertcat(data.traces.groupid) == groupid);
-    if ~ui.showMaskedTraces
-        masked = vertcat(data.traces(gidx).ismasked);
-        idx = gidx(find(~masked));
-    else
-        idx = gidx;
-    end
-    if isempty(idx); return; end
-    ui.hitraces(gidx) = false;
-    ui.hitraces(idx(end)) = true;
-    redraw();
-end
-
-function allTraces(src, event)
-    groupid = src.Parent.UserData;
-    gidx = find(vertcat(data.traces.groupid) == groupid);
-    ui.hitraces(gidx) = false;
-    redraw();
-end
-
-function toggleMaskTrace(src, event)
-    if ~ui.showTraces; return; end
-    groupid = src.Parent.UserData;
-    gidx = find(vertcat(data.traces.groupid) == groupid);
-    if ~ui.showMaskedTraces
-        masked = vertcat(data.traces(gidx).ismasked);
-        idx = gidx(find(~masked));
-    else
-        idx = gidx;
-    end
-    if isempty(idx); return; end
-    hdx = find(ui.hitraces(idx));
-    if numel(hdx) == 1
-        idx = idx(hdx);
-        data.traces(idx).ismasked = ~data.traces(idx).ismasked;
         redraw();
     end
 end
@@ -380,35 +176,12 @@ end
 function updateUi(src, event)
     if isempty(data.traces) || ~isfield(data.traces, 'groupid'); return; end
     ngroups = numel(unique(vertcat(data.traces.groupid)));
-%     ui.groupnames = {};
-%     for i = 1:ngroups
-%         if numel(data.groupnames) >= i
-%             ui.groupnames{i} = data.groupnames{i};
-%         else 
-%             ui.groupnames{i} = ['Group ' num2str(i)];
-%         end
-%     end
-%     while numel(ui.groupMenuItems) < ngroups
-%         groupid = numel(ui.groupMenuItems) + 1;
-%         ui.groupMenuItems = [ui.groupMenuItems; uimenu(ui.menu, ...
-%             'UserData', groupid, ...
-%             'Text', ui.groupnames{groupid}, ...
-%             'Checked', 'off', ...
-%             'MenuSelectedFcn', @selectGroup)];
-%     end
-%     while numel(ui.groupMenuItems) > ngroups
-%         delete(ui.groupMenuItems(end));
-%         ui.groupMenuItems(end) = [];
-%     end
-%     if ui.groupid > ngroups
-%         ui.groupid = 1;
-%     end
-%     [ui.groupMenuItems.Checked] = deal('off');
-%     ui.groupMenuItems(ui.groupid).Checked = 'on';
     while numel(ui.plots) < ngroups
         groupid = numel(ui.plots) + 1;
         ax = axes('Parent', ui.mainWindow, ...
             'Units', 'pixels', ...
+            'XLimMode', 'auto', ...
+            'YLimMode', 'auto', ...
             'UserData', groupid);
         plot(ax, 0, 0);
         ui.plots = [ui.plots; ax];
@@ -463,131 +236,310 @@ end
 
 function redraw(src, event)
     ui.traces = gobjects(numel(data.traces), 1);
+    ui.visibleTraces = [];
     for i = 1:numel(ui.plots)
         ax = ui.plots(i);
-%         if row == ui.groupid
-%             ax.LineWidth = 1;
-%             ax.FontWeight = 'bold';
-%         else
-%             ax.LineWidth = 0.5;
-%             ax.FontWeight = 'normal';
-%         end
         cla(ax);
         hold(ax, 'on');
         cmap = colormap(lines());
         traceIdxs = find(vertcat(data.traces.groupid) == i);
-        hitraceIdxs = traceIdxs(find(ui.hitraces(traceIdxs)));
-        if isempty(hitraceIdxs)
-            ui.plotcontrols(i).visibleTracesEdit.String = ['1-' num2str(numel(traceIdxs))];
-            ui.plotcontrols(i).maskTraceCheckBox.Value = 0;
-        elseif numel(hitraceIdxs) == 1
-            ui.plotcontrols(i).visibleTracesEdit.String = num2str(find(traceIdxs == hitraceIdxs));
-            ui.plotcontrols(i).maskTraceCheckBox.Value = data.traces(hitraceIdxs).ismasked;
+        selectedTraceIdxs = traceIdxs(find(ui.selectedTraces(traceIdxs)));
+        nonselectedTraceIdxs = setxor(traceIdxs, selectedTraceIdxs);
+        if isempty(selectedTraceIdxs)
+            ui.plotcontrols(i).selectedTracesEdit.String = ['1-' num2str(numel(traceIdxs))];
+            ui.plotcontrols(i).maskTraceCheckBox.Visible = false;
+        elseif numel(selectedTraceIdxs) == 1
+            ui.plotcontrols(i).selectedTracesEdit.String = num2str(find(traceIdxs == selectedTraceIdxs));
+            ui.plotcontrols(i).maskTraceCheckBox.Value = data.traces(selectedTraceIdxs).ismasked;
+            ui.plotcontrols(i).maskTraceCheckBox.Visible = true;
+        else
+            ui.plotcontrols(i).maskTraceCheckBox.Visible = false;
         end
-        if ui.showTraces
-            % non-highlighted traces
-            for j = 1:numel(traceIdxs)
-                traceIdx = traceIdxs(j);
+        if strcmp(ui.showTracesBtn.Checked, 'on') ...
+                && (strcmp(ui.showSelectedTracesOnlyBtn.Checked, 'off') || isempty(selectedTraceIdxs))
+            % non-selected traces
+            for j = 1:numel(nonselectedTraceIdxs)
+                traceIdx = nonselectedTraceIdxs(j);
+                tidx = find(traceIdxs == traceIdx, 1);
                 [x, y] = getTrace(data.traces(traceIdx));
-                if ~ui.hitraces(traceIdx)
-                    if ~data.traces(traceIdx).ismasked
-                        ui.traces(traceIdx) = plot(ax, x, y, 'color', cmap(j, :));
-                    elseif ui.showMaskedTraces
-                        ui.traces(traceIdx) = plot(ax, x, y, 'color', [0.5, 0.5, 0.5]);
-                    end
+                if ~data.traces(traceIdx).ismasked
+                    ui.traces(traceIdx) = plot(ax, x, y, 'color', cmap(tidx, :));
+                    ui.visibleTraces = [ui.visibleTraces; traceIdx];
+                elseif strcmp(ui.showMaskedTracesBtn.Checked, 'on')
+                    ui.traces(traceIdx) = plot(ax, x, y, 'color', [0.5, 0.5, 0.5]);
+                    ui.visibleTraces = [ui.visibleTraces; traceIdx];
                 end
             end
         end
-        if ui.showAverageTrace
+        if strcmp(ui.showAverageTraceBtn.Checked, 'on')
             % trace average
-            masked = find(vertcat(data.traces(traceIdxs).ismasked));
-            traceIdxs(masked) = [];
-            if ~isempty(traceIdxs)
-                [x, y] = getAverageTrace(data.traces(traceIdxs));
+            avgTraceIdxs = traceIdxs;
+            masked = find(vertcat(data.traces(avgTraceIdxs).ismasked));
+            avgTraceIdxs(masked) = [];
+            if ~isempty(avgTraceIdxs)
+                [x, y] = getAverageTrace(data.traces(avgTraceIdxs));
                 plot(ax, x, y, 'color', [0, 0, 0]);
             end
         end
-        if ui.showTraces
-            % highlighted traces
-            for j = 1:numel(traceIdxs)
-                traceIdx = traceIdxs(j);
+        if strcmp(ui.showTracesBtn.Checked, 'on')
+            % selected traces
+            for j = 1:numel(selectedTraceIdxs)
+                traceIdx = selectedTraceIdxs(j);
+                tidx = find(traceIdxs == traceIdx, 1);
                 [x, y] = getTrace(data.traces(traceIdx));
-                if ui.hitraces(traceIdx)
-                    if ~data.traces(traceIdx).ismasked
-                        ui.traces(traceIdx) = plot(ax, x, y, 'color', cmap(j, :), 'linewidth', 1.5);
-                    elseif ui.showMaskedTraces
-                        ui.traces(traceIdx) = plot(ax, x, y, 'color', [0.5, 0.5, 0.5], 'linewidth', 1.5);
-                    end
+                if ~data.traces(traceIdx).ismasked
+                    ui.traces(traceIdx) = plot(ax, x, y, 'color', cmap(tidx, :), 'linewidth', 1.5);
+                    ui.visibleTraces = [ui.visibleTraces; traceIdx];
+                elseif strcmp(ui.showMaskedTracesBtn.Checked, 'on')
+                    ui.traces(traceIdx) = plot(ax, x, y, 'color', [0.5, 0.5, 0.5], 'linewidth', 1.5);
+                    ui.visibleTraces = [ui.visibleTraces; traceIdx];
                 end
             end
         end
     end
 end
 
-% function mouseClickEvent(src, event)
-%     pos = ui.mainWindow.CurrentPoint;
-%     for i = 1:numel(ui.plots)
-%         bbox = ui.plots(i).Position;
-%         if pos(2) >= bbox(2) && pos(2) <= bbox(2) + bbox(4) ...
-%                 && pos(1) >= bbox(1) && pos(1) <= bbox(1) + bbox(3)
-%             selectGroup(src, event, i);
-%             break
-%         end
-%     end
-% end
+function autoscalePlots(src, event, xy)
+    if exist('xy', 'var')
+        if xy == 'x'
+            for i = 1:numel(ui.plots)
+                ax = ui.plots(i);
+                lims = groupXYLims(i);
+                ax.XLim = lims(1:2);
+            end
+        elseif xy == 'y'
+            for i = 1:numel(ui.plots)
+                ax = ui.plots(i);
+                lims = groupXYLims(i);
+                ax.YLim = lims(3:4);
+            end
+        end
+        return
+    end
+    for i = 1:numel(ui.plots)
+        ax = ui.plots(i);
+        axis(ax, groupXYLims(i));
+    end
+end
 
-function toggleShowTraces(src, event)
-    if ui.showTraces
-        ui.showTraces = false;
-        ui.showTracesBtn.Checked = 'off';
-    else
-        ui.showTraces = true;
-        ui.showTracesBtn.Checked = 'on';
+function zoomPlots(src, event, xy)
+    if exist('xy', 'var')
+        if xy == 'x'
+            w = waitforbuttonpress;
+            if w == 0 % click detected
+                pos = ui.mainWindow.CurrentPoint;
+                for i = 1:numel(ui.plots)
+                    ax = ui.plots(i);
+                    bbox = ax.Position;
+                    xv = [bbox(1), bbox(1) + bbox(3), bbox(1) + bbox(3), bbox(1)];
+                    yv = [bbox(2), bbox(2), bbox(2) + bbox(4), bbox(2) + bbox(4)];
+                    if inpolygon(pos(1), pos(2), xv, yv)
+                        rbox = rbbox;
+                        rbox
+%                         h = drawrectangle(ax);
+%                         h = imrect;
+%                         rbox = wait(h);
+%                         delete(h);
+%                         rbox
+                        return
+                    end
+                end
+            end
+        elseif xy == 'y'
+            % todo...
+        end
+    end
+end
+
+%% Plot control panels
+function controls = getPlotControls()
+    lh = 16;
+    bh = 40;
+    w = 150;
+    h = 10 + 3 * lh + bh;
+    controls.panel = uipanel(ui.mainWindow, ...
+        'Units', 'pixels', ...
+        'Position', [0, 0, w, h]);
+    t = h - 5;
+    w = w - 10;
+    controls.groupNameEdit = uicontrol(controls.panel, ...
+        'Style', 'edit', ...
+        'Units', 'pixels', ...
+        'Position', [5 t-lh, w, lh], ...
+        'CallBack', @groupNameEditChanged);
+    t = t - lh;
+    controls.selectedTracesEdit = uicontrol(controls.panel, ...
+        'Style', 'edit', ...
+        'Units', 'pixels', ...
+        'Position', [5, t-lh, 70, lh], ...
+        'CallBack', @selectedTracesEditChanged);
+    controls.numTracesText = uicontrol(controls.panel, ...
+        'Style', 'text', ...
+        'String', '/0', ...
+        'HorizontalAlignment', 'left', ...
+        'Units', 'pixels', ...
+        'Position', [75, t-lh, 35, lh]);
+    controls.showAllTracesBtn = uicontrol(controls.panel, ...
+        'Style', 'pushbutton', ...
+        'String', 'All', ...
+        'Units', 'pixels', ...
+        'Position', [110, t-lh, 35, lh], ...
+        'CallBack', @allTraces);
+    t = t - lh;
+    controls.firstTraceBtn = uicontrol(controls.panel, ...
+        'Style', 'pushbutton', ...
+        'String', '<<', ...
+        'Units', 'pixels', ...
+        'Position', [5, t-bh, 20, bh], ...
+        'CallBack', @firstTrace);
+    controls.prevTraceBtn = uicontrol(controls.panel, ...
+        'Style', 'pushbutton', ...
+        'String', '<', ...
+        'Units', 'pixels', ...
+        'Position', [25, t-bh, 50, bh], ...
+        'CallBack', @prevTrace);
+    controls.nextTraceBtn = uicontrol(controls.panel, ...
+        'Style', 'pushbutton', ...
+        'String', '>', ...
+        'Units', 'pixels', ...
+        'Position', [75, t-bh, 50, bh], ...
+        'CallBack', @nextTrace);
+    controls.lastTraceBtn = uicontrol(controls.panel, ...
+        'Style', 'pushbutton', ...
+        'String', '>>', ...
+        'Units', 'pixels', ...
+        'Position', [125, t-bh, 20, bh], ...
+        'CallBack', @lastTrace);
+    t = t - bh;
+    controls.maskTraceCheckBox = uicontrol(controls.panel, ...
+        'Style', 'checkbox', ...
+        'String', 'Masked', ...
+        'Units', 'pixels', ...
+        'Position', [5, t-lh, w, lh], ...
+        'CallBack', @toggleMaskTrace);
+    t = t - lh;
+end
+
+function groupNameEditChanged(src, event)
+    groupid = src.Parent.UserData;
+    data.groupnames{groupid} = src.String;
+    if isempty(src.String)
+        src.String = ['Group ' num2str(groupid)];
+    end
+end
+
+function selectedTracesEditChanged(src, event)
+    groupid = src.Parent.UserData;
+    gidx = find(vertcat(data.traces.groupid) == groupid);
+    idx = str2idx(src.String);
+    ui.selectedTraces(gidx) = false;
+    idx(find(idx < 1)) = [];
+    idx(find(idx > numel(gidx))) = [];
+    if numel(idx) < numel(gidx) && numel(idx) > 0
+        ui.selectedTraces(gidx(idx)) = true;
     end
     redraw();
 end
 
-function toggleShowMaskedTraces(src, event)
-    if ui.showMaskedTraces
-        ui.showMaskedTraces = false;
-        ui.showMaskedTracesBtn.Checked = 'off';
+function prevTrace(src, event)
+    groupid = src.Parent.UserData;
+    gidx = find(vertcat(data.traces.groupid) == groupid);
+    if strcmp(ui.showMaskedTracesBtn.Checked, 'off')
+        masked = vertcat(data.traces(gidx).ismasked);
+        idx = gidx(find(~masked));
     else
-        ui.showMaskedTraces = true;
-        ui.showMaskedTracesBtn.Checked = 'on';
+        idx = gidx;
     end
+    if isempty(idx); return; end
+    hdx = find(ui.selectedTraces(idx));
+    ui.selectedTraces(gidx) = false;
+    if isempty(hdx)
+        idx = idx(end);
+    elseif hdx(1) == 1
+        idx = idx(1);
+    else
+        idx = idx(hdx(1) - 1);
+    end
+    ui.selectedTraces(idx) = true;
     redraw();
 end
 
-function toggleShowAverageTrace(src, event)
-    if ui.showAverageTrace
-        ui.showAverageTrace = false;
-        ui.showAverageTraceBtn.Checked = 'off';
+function nextTrace(src, event)
+    groupid = src.Parent.UserData;
+    gidx = find(vertcat(data.traces.groupid) == groupid);
+    if strcmp(ui.showMaskedTracesBtn.Checked, 'off')
+        masked = vertcat(data.traces(gidx).ismasked);
+        idx = gidx(find(~masked));
     else
-        ui.showAverageTrace = true;
-        ui.showAverageTraceBtn.Checked = 'on';
+        idx = gidx;
     end
+    if isempty(idx); return; end
+    hdx = find(ui.selectedTraces(idx));
+    ui.selectedTraces(gidx) = false;
+    if isempty(hdx)
+        idx = idx(1);
+    elseif hdx(end) == numel(idx)
+        idx = idx(end);
+    else
+        idx = idx(hdx(end) + 1);
+    end
+    ui.selectedTraces(idx) = true;
     redraw();
 end
 
-function toggleOverlayGroups(src, event)
-    if ui.overlayGroups
-        ui.overlayGroups = false;
-        ui.overlayGroupsBtn.Checked = 'off';
+function firstTrace(src, event)
+    groupid = src.Parent.UserData;
+    gidx = find(vertcat(data.traces.groupid) == groupid);
+    if strcmp(ui.showMaskedTracesBtn.Checked, 'off')
+        masked = vertcat(data.traces(gidx).ismasked);
+        idx = gidx(find(~masked));
     else
-        ui.overlayGroups = true;
-        ui.overlayGroupsBtn.Checked = 'on';
+        idx = gidx;
     end
-    updateUi();
+    if isempty(idx); return; end
+    ui.selectedTraces(gidx) = false;
+    ui.selectedTraces(idx(1)) = true;
+    redraw();
 end
 
-function autoscale(src, event, ax)
-    if exist('ax', 'var')
-        axis(ax, [-inf, inf, -inf, inf]);
-        return;
+function lastTrace(src, event)
+    groupid = src.Parent.UserData;
+    gidx = find(vertcat(data.traces.groupid) == groupid);
+    if strcmp(ui.showMaskedTracesBtn.Checked, 'off')
+        masked = vertcat(data.traces(gidx).ismasked);
+        idx = gidx(find(~masked));
+    else
+        idx = gidx;
     end
-    for row = 1:size(ui.plots, 1)
-        ax = ui.plots(row);
-        axis(ax, [-inf, inf, -inf, inf]);
+    if isempty(idx); return; end
+    ui.selectedTraces(gidx) = false;
+    ui.selectedTraces(idx(end)) = true;
+    redraw();
+end
+
+function allTraces(src, event)
+    groupid = src.Parent.UserData;
+    gidx = find(vertcat(data.traces.groupid) == groupid);
+    ui.selectedTraces(gidx) = false;
+    redraw();
+end
+
+function toggleMaskTrace(src, event)
+    if ~ui.showTraces; return; end
+    groupid = src.Parent.UserData;
+    gidx = find(vertcat(data.traces.groupid) == groupid);
+    if strcmp(ui.showMaskedTracesBtn.Checked, 'off')
+        masked = vertcat(data.traces(gidx).ismasked);
+        idx = gidx(find(~masked));
+    else
+        idx = gidx;
+    end
+    if isempty(idx); return; end
+    hdx = find(ui.hitraces(idx));
+    if numel(hdx) == 1
+        idx = idx(hdx);
+        data.traces(idx).ismasked = ~data.traces(idx).ismasked;
+        redraw();
     end
 end
 
@@ -629,9 +581,8 @@ function loadData(src, event, filepath)
     olddata = data;
     figure(ui.mainWindow);
     title(ui.plots(1), [data.date ' | PatchID: ' data.patchid ' | Exp: ' data.experiment]);
-    ui.hitraces = false(size(data.traces));
+    ui.selectedTraces = false(size(data.traces));
 	updateUi();
-    autoscale();
 end
 
 function saveData(src, event, filepath)
@@ -675,17 +626,6 @@ function groupInterleavedTraces(src, event, ngroups)
 	updateUi();
 end
 
-% function selectGroup(src, event, groupid)
-%     if exist('groupid', 'var')
-%         ui.groupid = groupid;
-%     else
-%         ui.groupid = src.UserData;
-%     end
-%     [ui.groupMenuItems.Checked] = deal('off');
-%     ui.groupMenuItems(ui.groupid).Checked = 'on';
-%     redraw();
-% end
-
 %% Data manipulations
 function undo(src, event)
     data = olddata;
@@ -700,7 +640,8 @@ function baseline(src, event, type)
         type = list{idx};
     end
     olddata = data;
-    for i = 1:numel(ui.traces)
+    for vi = 1:numel(ui.visibleTraces)
+        i = ui.visibleTraces(vi);
         sel = find(logical(ui.traces(i).BrushData));
         if ~isempty(sel)
             if strcmp(type, 'Flat')
@@ -731,7 +672,8 @@ function normalize(src, event, direction)
         direction = list{idx};
     end
     olddata = data;
-    for i = 1:numel(ui.traces)
+    for vi = 1:numel(ui.visibleTraces)
+        i = ui.visibleTraces(vi);
         sel = find(logical(ui.traces(i).BrushData));
         if ~isempty(sel)
             y = data.traces(i).y - data.traces(i).y0;
@@ -760,7 +702,8 @@ function alignToOnset(src, event, xSD, direction)
         direction = list{idx};
     end
     olddata = data;
-    for i = 1:numel(ui.traces)
+    for vi = 1:numel(ui.visibleTraces)
+        i = ui.visibleTraces(vi);
         sel = find(logical(ui.traces(i).BrushData));
         if ~isempty(sel)
             [x, y] = getTrace(data.traces(i));
@@ -779,6 +722,97 @@ function alignToOnset(src, event, xSD, direction)
         end
     end
     redraw();
+end
+
+%% helper functions
+function idx = str2idx(str)
+    idx = [];
+    fields = split(string(str), [",", " "]);
+    for i = 1:numel(fields)
+        field = strtrim(fields{i});
+        if ~isempty(field)
+            if ~isempty(strfind(field, "-"))
+                subfields = split(field, "-");
+                if numel(subfields) == 2
+                    first = str2num(subfields{1});
+                    last = str2num(subfields{2});
+                    for j = first:last
+                        idx = [idx, j];
+                    end
+                end
+            else
+                idx = [idx, str2num(field)];
+            end
+        end
+    end
+    idx = unique(idx);
+end
+
+function str = idx2str(idx)
+    idx = unique(idx);
+    strs = [];
+    a = [];
+    for i = 1:numel(idx)
+        if isempty(a) || idx(i) == a(end) + 1
+            a = [a, idx(i)];
+        else
+            if numel(a) == 1
+                strs = [strs, num2str(a(1))];
+            else
+                strs = [strs, num2str(a(1)) + "-" + num2str(a(end))];
+            end
+        end
+    end
+    str = join(strs, ",");
+end
+
+function xylims = groupXYLims(groupid, visibleOnly)
+    if ~exist('visibleOnly', 'var')
+        visibleOnly = true;
+    end
+    xylims = [-inf, inf, -inf, inf];
+    if visibleOnly
+        ax = ui.plots(groupid);
+        for i = 1:numel(ax.Children)
+            if strcmp(ax.Children(i).Type, "line")
+                xmin = min(ax.Children(i).XData);
+                xmax = max(ax.Children(i).XData);
+                ymin = min(ax.Children(i).YData);
+                ymax = max(ax.Children(i).YData);
+                if isinf(xylims)
+                    xylims = [xmin, xmax, ymin, ymax];
+                else
+                    xylims = [xylims; xmin, xmax, ymin, ymax];
+                end
+            end
+        end
+    else
+        idx = find(vertcat(data.traces.groupid) == groupid);
+        for i = 1:numel(idx)
+            j = idx(i);
+            xmin = min(data.traces(j).x);
+            xmax = max(data.traces(j).x);
+            ymin = min(data.traces(j).y);
+            ymax = max(data.traces(j).y);
+            if isinf(xylims)
+                xylims = [xmin, xmax, ymin, ymax];
+            else
+                xylims = [xylims; xmin, xmax, ymin, ymax];
+            end
+        end
+    end
+    if size(xylims, 1) > 1
+        xylims(1,1) = min(xylims(:,1));
+        xylims(1,2) = max(xylims(:,2));
+        xylims(1,3) = min(xylims(:,3));
+        xylims(1,4) = max(xylims(:,4));
+        xylims(2:end,:) = [];
+    end
+    if ~isinf(xylims)
+        % add margins around y data
+        xylims(3) = xylims(3) - 0.05 * diff(xylims(3:4));
+        xylims(4) = xylims(4) + 0.05 * diff(xylims(3:4));
+    end
 end
 
 %% keyboard input
