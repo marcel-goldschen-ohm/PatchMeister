@@ -23,10 +23,9 @@ Tested with MATLAB R2018b.
     * :construction: AxoGraph or AxographX datafile
 * *Organize a series of current vs. time sweeps by splitting them into groups.*
     * Group interleaved sweeps.
-    * :construction: Group blocks of sweeps.
+    * Group blocks of sweeps.
     * :construction: Manually group arbitrary sweeps.
     * Optionally show average of sweeps in each group.
-    * :construction: Optionally overlay all groups in a single plot.
 * *Visually step through a group of sweeps.*
     * Buttons to step forward/backward through a group of sweeps.
     * Optionally show only the selected sweep(s).
@@ -41,4 +40,4 @@ Tested with MATLAB R2018b.
     * **Baseline two region (sloping)** - Baseline Y data by subtracting line through (x,y) mean of each of two regions of contiguous selected data points.
     * **Normalize** - Normalize Y data (absolute value, positive or negative) to selected data points.
     * **Align to Onset** - Set time zero (X offset) to first data point following selected data points that is some number of standard deviations of the selected data points away (absolute value, positive or negative) from the mean of the selected data points. Note that this may shift traces such that the data points at the beginning or end of the trace no longer align in time with data points at the beginning or end of other traces. The group average will automatically handle these offsets by trimming each trace in the group to the set of overlapping points prior to averaging.
-    * :construction: **Manually specify X and Y offsets and Y scale factor** - Set time zero (X offset), baseline (Y offset) and Y scale.
+    * **Manually specify X and Y offsets and Y scale factor** - Set time zero (X offset), baseline (Y offset) and Y scale.
