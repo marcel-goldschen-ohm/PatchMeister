@@ -40,9 +40,11 @@ function [x, y] = getAverageTrace(traces)
 end
 
 template.data = struct();
-template.data.date = '';
-template.data.patchid = '';
-template.data.experiment = '';
+template.data.info = containers.Map;
+template.data.info('date') = '';
+template.data.info('patchid') = '';
+template.data.info('construct') = '';
+template.data.info('experiment') = '';
 template.data.traces = [];
 template.data.units = {'sec', 'pA'};
 template.data.groupnames = {};
@@ -54,9 +56,9 @@ ui = struct();
 initUi();
 set(ui.mainWindow, 'KeyPressFcn', @keyPress);
 set(ui.mainWindow, 'SizeChangedFcn', @resizeUi);
+ui.path = pwd();
 
 %% user init
-
 
 %% UI
 function initUi()
@@ -102,11 +104,11 @@ function initUi()
         'MenuSelectedFcn', @toggleBtnCheckedOption);
     ui.showMaskedTracesBtn = uimenu(ui.menu, ...
         'Text', 'Show Masked Traces', ...
-        'Checked', 'on', ...
+        'Checked', 'off', ...
         'MenuSelectedFcn', @toggleBtnCheckedOption);
     ui.showSelectedTracesOnlyBtn = uimenu(ui.menu, ...
         'Text', 'Show Selected Traces Only', ...
-        'Checked', 'off', ...
+        'Checked', 'on', ...
         'MenuSelectedFcn', @toggleBtnCheckedOption);
     ui.showAverageTraceBtn = uimenu(ui.menu, ...
         'Text', 'Show Average Trace', ...
@@ -127,8 +129,8 @@ function initUi()
     
     ax = axes('Parent', ui.mainWindow, ...
         'Units', 'pixels', ...
-        'XLimMode', 'auto', ...
-        'YLimMode', 'auto', ...
+        'XLimMode', 'manual', ...
+        'YLimMode', 'manual', ...
         'UserData', 1);
     plot(ax, 0, 0);
     ui.plots = [ax];
@@ -180,8 +182,8 @@ function updateUi(src, event)
         groupid = numel(ui.plots) + 1;
         ax = axes('Parent', ui.mainWindow, ...
             'Units', 'pixels', ...
-            'XLimMode', 'auto', ...
-            'YLimMode', 'auto', ...
+            'XLimMode', 'manual', ...
+            'YLimMode', 'manual', ...
             'UserData', groupid);
         plot(ax, 0, 0);
         ui.plots = [ui.plots; ax];
@@ -304,13 +306,13 @@ function autoscalePlots(src, event, xy)
         if xy == 'x'
             for i = 1:numel(ui.plots)
                 ax = ui.plots(i);
-                lims = groupXYLims(i);
+                lims = axesXYLims(ax);
                 ax.XLim = lims(1:2);
             end
         elseif xy == 'y'
             for i = 1:numel(ui.plots)
                 ax = ui.plots(i);
-                lims = groupXYLims(i);
+                lims = axesXYLims(ax);
                 ax.YLim = lims(3:4);
             end
         end
@@ -318,36 +320,8 @@ function autoscalePlots(src, event, xy)
     end
     for i = 1:numel(ui.plots)
         ax = ui.plots(i);
-        axis(ax, groupXYLims(i));
-    end
-end
-
-function zoomPlots(src, event, xy)
-    if exist('xy', 'var')
-        if xy == 'x'
-            w = waitforbuttonpress;
-            if w == 0 % click detected
-                pos = ui.mainWindow.CurrentPoint;
-                for i = 1:numel(ui.plots)
-                    ax = ui.plots(i);
-                    bbox = ax.Position;
-                    xv = [bbox(1), bbox(1) + bbox(3), bbox(1) + bbox(3), bbox(1)];
-                    yv = [bbox(2), bbox(2), bbox(2) + bbox(4), bbox(2) + bbox(4)];
-                    if inpolygon(pos(1), pos(2), xv, yv)
-                        rbox = rbbox;
-                        rbox
-%                         h = drawrectangle(ax);
-%                         h = imrect;
-%                         rbox = wait(h);
-%                         delete(h);
-%                         rbox
-                        return
-                    end
-                end
-            end
-        elseif xy == 'y'
-            % todo...
-        end
+        lims = axesXYLims(ax);
+        axis(ax, lims);
     end
 end
 
@@ -525,7 +499,7 @@ function allTraces(src, event)
 end
 
 function toggleMaskTrace(src, event)
-    if ~ui.showTraces; return; end
+    if strcmp(ui.showTracesBtn.Checked, 'off'); return; end
     groupid = src.Parent.UserData;
     gidx = find(vertcat(data.traces.groupid) == groupid);
     if strcmp(ui.showMaskedTracesBtn.Checked, 'off')
@@ -535,7 +509,7 @@ function toggleMaskTrace(src, event)
         idx = gidx;
     end
     if isempty(idx); return; end
-    hdx = find(ui.hitraces(idx));
+    hdx = find(ui.selectedTraces(idx));
     if numel(hdx) == 1
         idx = idx(hdx);
         data.traces(idx).ismasked = ~data.traces(idx).ismasked;
@@ -546,14 +520,14 @@ end
 %% I/O
 function loadData(src, event, filepath)
     if ~exist('filepath', 'var') || isempty(filepath)
-        [file, path] = uigetfile('*.mat', 'Open data file.');
+        [file, path] = uigetfile(fullfile(ui.path, '*.mat'), 'Open data file.');
         if isequal(file, 0); return; end
         filepath = fullfile(path, file);
     end
     wb = waitbar(0, 'Loading data file...');
     tmp = load(filepath);
     close(wb);
-    [path, file, ext] = fileparts(filepath);
+    [ui.path, file, ext] = fileparts(filepath);
     file = strrep(file, '_', ' ');
     if isfield(tmp, 'data') % assume PatchMeister .mat file
         data = tmp.data;
@@ -567,29 +541,35 @@ function loadData(src, event, filepath)
             data.traces(i).x = xy(:,1);
             data.traces(i).y = xy(:,2) .* 1e12; % A -> pA
         end
-        if numel(file) >= 10
-            data.date = file(1:10);
-        end
         idx = strfind(file, ' ');
-        if numel(idx) == 1
-            data.patchid = file(idx + 1:end);
-        elseif numel(idx) > 1
-            data.patchid = file(idx(1) + 1:idx(2) - 1);
-            data.experiment = file(idx(2) + 1:end);
-        end
+        idx = [idx, repmat(length(file) + 1, [1, 3])];
+        data.info('date') = file(1:idx(1) - 1);
+        data.info('patchid') = file(idx(1) + 1:idx(2) - 1);
+        data.info('construct') = file(idx(2) + 1:idx(3) - 1);
+        data.info('experiment') = file(idx(3) + 1:end);
     end
     olddata = data;
     figure(ui.mainWindow);
-    title(ui.plots(1), [data.date ' | PatchID: ' data.patchid ' | Exp: ' data.experiment]);
+    title(ui.plots(1), [data.info('date') ...
+        ' | PatchID: ' data.info('patchid') ...
+        ' | Construct: ' data.info('construct') ...
+        ' | Exp: ' data.info('experiment')]);
     ui.selectedTraces = false(size(data.traces));
 	updateUi();
+    autoscalePlots();
 end
 
 function saveData(src, event, filepath)
     if ~exist('filepath', 'var') || isempty(filepath)
-        [file, path] = uiputfile('*.mat', 'Save data to file.');
+        default = fullfile(ui.path, [data.info('date') ...
+            ' ' data.info('patchid') ...
+            ' ' data.info('construct') ...
+            ' ' data.info('experiment') ...
+            '.mat']);
+        [file, path] = uiputfile(default, 'Save data to file.');
         if isequal(file, 0); return; end
         filepath = fullfile(path, file);
+        ui.path = path;
     end
     wb = waitbar(0, 'Saving data to file...');
     save(filepath, 'data');
@@ -597,12 +577,18 @@ function saveData(src, event, filepath)
 end
 
 function editInfo(src, event)
-    answer = inputdlg({'Date:', 'Patch ID:', 'Experiment:'}, 'Info', 1, {data.date, data.patchid, data.experiment});
-    data.date = answer{1};
-    data.patchid = answer{2};
-    data.experiment = answer{3};
+    answer = inputdlg({'Date:', 'Patch ID:', 'Construct:', 'Experiment:'}, ...
+        'Info', 1, ...
+        {data.info('date'), data.info('patchid'), data.info('construct'), data.info('experiment')});
+    data.info('date') = answer{1};
+    data.info('patchid') = answer{2};
+    data.info('construct') = answer{3};
+    data.info('experiment') = answer{4};
     figure(ui.mainWindow);
-    title(ui.plots(1), [data.date ' | PatchID: ' data.patchid ' | Exp: ' data.experiment]);
+    title(ui.plots(1), [data.info('date') ...
+        ' | PatchID: ' data.info('patchid') ...
+        ' | Construct: ' data.info('construct') ...
+        ' | Exp: ' data.info('experiment')]);
 end
 
 %% Groups
@@ -611,6 +597,7 @@ function mergeGroups(src, event)
     [data.traces(:).groupid] = deal(1);
     ui.hitraces(:) = false;
 	updateUi();
+    autoscalePlots();
 end
 
 function groupInterleavedTraces(src, event, ngroups)
@@ -624,6 +611,7 @@ function groupInterleavedTraces(src, event, ngroups)
     end
     ui.hitraces(:) = false;
 	updateUi();
+    autoscalePlots();
 end
 
 %% Data manipulations
@@ -717,7 +705,7 @@ function alignToOnset(src, event, xSD, direction)
                 idx = find(y(sel(end) + 1:end) < -xSD * bs, 1);
             end
             if idx
-                data.traces(i).x0 = data.traces(i).x(idx);
+                data.traces(i).x0 = data.traces(i).x(sel(end) + idx);
             end
         end
     end
@@ -766,34 +754,14 @@ function str = idx2str(idx)
     str = join(strs, ",");
 end
 
-function xylims = groupXYLims(groupid, visibleOnly)
-    if ~exist('visibleOnly', 'var')
-        visibleOnly = true;
-    end
+function xylims = axesXYLims(ax)
     xylims = [-inf, inf, -inf, inf];
-    if visibleOnly
-        ax = ui.plots(groupid);
-        for i = 1:numel(ax.Children)
-            if strcmp(ax.Children(i).Type, "line")
-                xmin = min(ax.Children(i).XData);
-                xmax = max(ax.Children(i).XData);
-                ymin = min(ax.Children(i).YData);
-                ymax = max(ax.Children(i).YData);
-                if isinf(xylims)
-                    xylims = [xmin, xmax, ymin, ymax];
-                else
-                    xylims = [xylims; xmin, xmax, ymin, ymax];
-                end
-            end
-        end
-    else
-        idx = find(vertcat(data.traces.groupid) == groupid);
-        for i = 1:numel(idx)
-            j = idx(i);
-            xmin = min(data.traces(j).x);
-            xmax = max(data.traces(j).x);
-            ymin = min(data.traces(j).y);
-            ymax = max(data.traces(j).y);
+    for i = 1:numel(ax.Children)
+        if strcmp(ax.Children(i).Type, "line")
+            xmin = min(ax.Children(i).XData);
+            xmax = max(ax.Children(i).XData);
+            ymin = min(ax.Children(i).YData);
+            ymax = max(ax.Children(i).YData);
             if isinf(xylims)
                 xylims = [xmin, xmax, ymin, ymax];
             else
