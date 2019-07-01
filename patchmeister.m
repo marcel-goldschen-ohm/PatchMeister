@@ -685,9 +685,9 @@ updateUI_();
             [data.traces(rows,channel).x0] = deal(0);
             [data.traces(rows,channel).y0] = deal(0);
             [data.traces(rows,channel).yscale] = deal(1);
-            for j = 1:numel(rows)
-                data.traces(rows(j),channel).rois = repmat(template.roi, [0,0]);
-            end
+            [data.traces(rows,channel).masked] = deal([]);
+            [data.traces(rows,channel).zeroed] = deal([]);
+            [data.traces(rows,channel).interpolated] = deal([]);
         end
         refresh_();
     end
@@ -1733,6 +1733,9 @@ end
             file = strrep(file, '_', ' ');
             if isfield(tmp, 'data') % assume PatchMeister .mat file
                 data.info = tmp.data.info;
+                if ~isKey(data.info, 'notes')
+                    data.info('notes') = '';
+                end
                 data.traces = repmat(template.trace, size(tmp.data.traces));
                 for i = 1:size(tmp.data.traces,1)
                     for j = 1:size(tmp.data.traces,2)
@@ -1784,11 +1787,11 @@ end
             else % assume PatchMaster .mat file export
                 traceLabels = fieldnames(tmp);
                 ntraces = numel(traceLabels);
-                data.traces = repmat(template.traces, [ntraces, 1]);
+                data.traces = repmat(template.trace, [ntraces, 1]);
                 for i = 1:ntraces
                     xy = tmp.(traceLabels{i});
                     data.traces(i,1).x = xy(:,1);
-                    data.sweeps(i,1).y = xy(:,2) .* 1e12; % A -> pA
+                    data.traces(i,1).y = xy(:,2) .* 1e12; % A -> pA
                 end
                 data.xlabels = {'Time', 's'};
                 data.ylabels = {'Current', 'pA'};
