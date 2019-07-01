@@ -36,12 +36,13 @@ Tested with MATLAB R2019a.
    * Masked sweeps are flagged, but NOT deleted.
    * Optionally show or hide masked sweeps.
 * *Basic manipulation of sweep data.*
-    * Sweep manipulations are stored as offsets and scale factors (original data is NOT directly altered).
-    * You can always optionally view the raw data.
+    * Sweep manipulations are stored as offsets and scale factors (**original data is NOT directly altered**).
+    * **You can always optionally view the original raw data.**
     * Manipulations can be applied to one or any number of sweeps simultaneously by selecting appropriate data regions in each of the desired sweeps using MATLAB's brush tool. How the selected data points are used depends on the manipulation.
-    * :construction:
-    * **Baseline one region (flat)** - Baseline Y data to mean of selected data points.
-    * **Baseline two region (sloping)** - Baseline Y data by subtracting line through (x,y) mean of each of two regions of contiguous selected data points.
-    * **Normalize** - Normalize Y data (absolute value, positive or negative) to selected data points.
+    * **Baseline Flat** - Baseline Y data to mean of selected data points.
+    * **Baseline Sloping Two Region** - Baseline Y data by subtracting line through (x,y) mean of each of two regions of contiguous selected data points.
+    * **Baseline Spline** - Baseline Y data by subtracting a spline fit through the selected data points.
+    * **Normalize Positive/Negative/AbsPeak** - Normalize Y data to max, min or absmax of selected data points.
     * **Align to Onset** - Set time zero (X offset) to first data point following selected data points that is some number of standard deviations of the selected data points away (absolute value, positive or negative) from the mean of the selected data points. Note that this may shift traces such that the data points at the beginning or end of the trace no longer align in time with data points at the beginning or end of other traces. The group average will automatically handle these offsets by trimming each trace in the group to the set of overlapping points prior to averaging.
     * **Manually specify X and Y offsets and Y scale factor** - Set time zero (X offset), baseline (Y offset) and Y scale.
+    * **Mask/Zero/Interpolate** - Mask, zero or interpolate selected segments of data points.
