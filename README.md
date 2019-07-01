@@ -2,18 +2,20 @@
 Electrophysiology patch-clamp time series analysis (NOT acquisition).
 
 PatchMeister is...
-* a free and open source GUI for analyis of patch-clamp electrophysiology data.
-* for analysis ONLY, it does NOT have the capability to aquire data from a digitizer/amplifier. 
-* currently a basic but highly useful analysis tool for analyzing series of current vs. time sweeps.
-* currently primarily for ensemble current measurements, NOT for single-channel analysis.
-* easily extended for custom analyses (it's all just [MATLAB](http://www.mathworks.com/products/matlab) code).
+* A free and open source graphical user interface for analyis of patch-clamp electrophysiology data or similar time series measurements.
+* For analysis ONLY, it does NOT have the capability to acquire data from a digitizer/amplifier. 
+* Handles multiple channels (e.g. current, voltage, etc.) and arbitrary grouping of sweeps.
+* Currently primarily for analysis of ensemble measurements as opposed to, for example, single-channel analysis.
+* Easily extended for custom analyses (it's all just [MATLAB](http://www.mathworks.com/products/matlab) code).
 
 Copyright 2019 by Marcel Goldschen-Ohm <goldschen-ohm@utexas.edu>
 
 ### Install
-Everything is in patch_meister.m
+Everything is in patchmeister.m
 
-Tested with MATLAB R2018b.
+Baseline spline fitting requires the [splinefit](https://www.mathworks.com/matlabcentral/fileexchange/71225-splinefit) package. Easiest option is to install it via MATLAB's Add-On Explorer.
+
+Tested with MATLAB R2019a.
 
 ### Capabilites
 * *Import data.*
@@ -21,20 +23,21 @@ Tested with MATLAB R2018b.
     * :construction: HEKA PatchMaster datafile
     * :construction: Molecular Devices pCLAMP datafile
     * :construction: AxoGraph or AxographX datafile
-* *Organize a series of current vs. time sweeps by splitting them into groups.*
-    * Group interleaved sweeps.
-    * Group blocks of sweeps.
-    * :construction: Manually group arbitrary sweeps.
-    * Optionally show average of sweeps in each group.
+* *Organize a series of current/voltage/etc vs. time sweeps by splitting them into groups.*
+    * View one or more selected channels (e.g. current, voltage, etc.)
+    * Group interleaved sweeps for each channel.
+    * Group blocks of sweeps for each channel.
+    * Manually group arbitrary sweeps for each channel.
+    * Optionally show average sweep for each group.
 * *Visually step through a group of sweeps.*
     * Buttons to step forward/backward through a group of sweeps.
-    * Optionally show only the selected sweep(s).
-    * Optionally show all sweeps with selected sweep(s) highlighted.
-* *Mask selected sweeps to remove them from analysis (e.g. average).*
+    * Optionally show any arbitrary range of selected sweep(s).
+* *Mask sweeps to remove them from any subsequent analyses.*
    * Masked sweeps are flagged, but NOT deleted.
    * Optionally show or hide masked sweeps.
 * *Basic manipulation of sweep data.*
     * Sweep manipulations are stored as offsets and scale factors (original data is NOT directly altered).
+    * You can always optionally view the raw data.
     * Manipulations can be applied to one or any number of sweeps simultaneously by selecting appropriate data regions in each of the desired sweeps using MATLAB's brush tool. How the selected data points are used depends on the manipulation.
     * **Baseline one region (flat)** - Baseline Y data to mean of selected data points.
     * **Baseline two region (sloping)** - Baseline Y data by subtracting line through (x,y) mean of each of two regions of contiguous selected data points.
