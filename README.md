@@ -39,6 +39,7 @@ Tested with MATLAB R2019a.
     * Sweep manipulations are stored as offsets and scale factors (original data is NOT directly altered).
     * You can always optionally view the raw data.
     * Manipulations can be applied to one or any number of sweeps simultaneously by selecting appropriate data regions in each of the desired sweeps using MATLAB's brush tool. How the selected data points are used depends on the manipulation.
+    * :construction:
     * **Baseline one region (flat)** - Baseline Y data to mean of selected data points.
     * **Baseline two region (sloping)** - Baseline Y data by subtracting line through (x,y) mean of each of two regions of contiguous selected data points.
     * **Normalize** - Normalize Y data (absolute value, positive or negative) to selected data points.
