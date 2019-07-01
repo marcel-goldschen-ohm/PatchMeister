@@ -7,9 +7,15 @@ function patchmeister()
 global data;
 global ui;
 
-% A trace is typically a contiguous episode of some measurement vs. time,
+% A trace is a list of (x,y) data points for some measurement vs. time,
 % e.g. as obtained during episodic acquisition in an electrophysiology
 % experiment.
+%
+% !!! The original raw (x,y) data should NEVER be altered unless you are
+% absolutely sure of what you are doing. Instead, offsets and scale
+% factors, as well as masked, zeroed and interpolated regions are stored
+% separately, and can be used to reconstruct the adjusted (e.g. baselined,
+% scaled, masked, etc.) trace from the raw data.
 %
 % Each trace is alloted its own x data to ease grouping traces with
 % differing x values. Note, however, that assigning the x values of one
@@ -17,17 +23,18 @@ global ui;
 % write rules.
 %
 template.trace.x = []; % Tx1, e.g. time
-template.trace.y = []; % Tx1, e.g. current
+template.trace.y = []; % Tx1, e.g. current, voltage, etc.
 template.trace.x0 = 0; % 1x1 time zero offset
 template.trace.y0 = 0; % 1x1 (uniform) OR Tx1 (nonuniform) baseline offset
 template.trace.yscale = 1; % 1x1 (uniform) OR Tx1 (nonuniform) scale factor
-template.trace.ismasked = false; % mask flag for entire trace
+template.trace.ismasked = false; % 1x1 logical flag for masking entire trace
 template.trace.masked = []; % Tx1 logical for masked data points
 template.trace.zeroed = []; % Tx1 logical for zeroed data points
-template.trace.interpolated = []; % Tx1 logical for interpolated regions
+template.trace.interpolated = []; % Tx1 logical for interpolated segments
 
-% (sweeps x channels) traces
-data.traces = repmat(template.trace, [0,0]);
+% Each column is a channel (e.g. current, voltage, etc.)
+% Each row is a sweep - a single data trace for each channel.
+data.traces = repmat(template.trace, [0,0]); % sweeps x channels
 data.xlabels = {}; % e.g. {'Time', 'ms'}
 data.ylabels = {}; % (channels x 2), e.g. {'Current', 'pA'; 'Voltage', 'mV'}
 
@@ -84,7 +91,7 @@ updateUI_();
         if any(trace.zeroed)
             y(trace.zeroed) = 0;
         end
-        if any(trace.masked)
+        if any(trace.masked) && ui.showMaskedBtn.Checked == "off"
             y(trace.masked) = nan;
         end
     end
@@ -100,6 +107,8 @@ updateUI_();
         else
             [x,y] = getTrace_(traces(1));
         end
+        n = ones(size(y));
+        n(isnan(y)) = 0;
         dx = min(diff(x));
         epsilon = 0.01 * dx;
         for i = 2:numel(traces)
@@ -116,7 +125,17 @@ updateUI_();
                 indi = intersect(find(xi >= x(1) - epsilon), find(xi <= x(end) + epsilon));
                 if numel(ind) == numel(indi)
                     x = x(ind);
-                    y = y(ind,:) + yi(indi,:);
+                    n = n(ind);
+                    y = y(ind);
+                    yi = yi(indi);
+                    ynan = isnan(y);
+                    yinan = isnan(yi);
+                    notnan = ~ynan & ~yinan;
+                    y(ynan) = yi(ynan);
+                    n(ynan) = 1;
+                    y(notnan) = y(notnan) + yi(notnan);
+                    n(notnan) = n(notnan) + 1;
+                    n(isnan(y)) = 0;
                 else
                     disp('ERROR: Invalid overlapping indices for sweep average.');
                 end
@@ -124,7 +143,7 @@ updateUI_();
                 disp('ERROR: Sweeps have different sample intervals.');
             end
         end
-        y = y ./ numel(traces);
+        y = y ./ n;
     end
 
     function segments = breakIntoContiguousSegments_(pts)
@@ -168,14 +187,16 @@ updateUI_();
         end
         lims = [];
         for i = 1:numel(ax)
-            if isinf(lims)
-                lims = axesXYLims_(ax(i));
-            else
-                lims = [lims; axesXYLims_(ax(i))];
-            end
+            lims = [lims; axesXYLims_(ax(i))];
         end
-        lims(:,1) = min(lims(:,1));
-        lims(:,2) = max(lims(:,2));
+        i = ~isinf(lims(:,1));
+        if any(i)
+            lims(:,1) = min(lims(i,1));
+        end
+        i = ~isinf(lims(:,2));
+        if any(i)
+            lims(:,2) = max(lims(i,2));
+        end
         for i = 1:numel(ax)
             axis(ax(i), lims(i,:));
         end
@@ -644,8 +665,6 @@ updateUI_();
                         data.traces(row,channel).interpolated = ...
                             data.traces(row,channel).interpolated | brushdata';
                     end
-%                     data.traces(row,channel).interpolated(1) = false;
-%                     data.traces(row,channel).interpolated(end) = false;
                     didit = true;
                 end
             end
@@ -685,9 +704,9 @@ updateUI_();
             [data.traces(rows,channel).x0] = deal(0);
             [data.traces(rows,channel).y0] = deal(0);
             [data.traces(rows,channel).yscale] = deal(1);
-            [data.traces(rows,channel).masked] = deal([]);
-            [data.traces(rows,channel).zeroed] = deal([]);
-            [data.traces(rows,channel).interpolated] = deal([]);
+            [data.traces(rows,channel).ismasked] = deal([]);
+            [data.traces(rows,channel).iszeroed] = deal([]);
+            [data.traces(rows,channel).isinterpolated] = deal([]);
         end
         refresh_();
     end
@@ -874,11 +893,11 @@ updateUI_();
             for j = 1:nvischannels
                 ax = ui.groups(i).ax(j);
                 if i < ngroups
-                    axh = floor((ph-20) / nvischannels);
-                    ax.Position = [80, ph-j*axh, pw-100, axh-10];
+                    axh = floor((ph-27) / nvischannels);
+                    ax.Position = [80, ph-7-j*axh, pw-100, axh-10];
                 else
-                    axh = floor((ph-20-15) / nvischannels);
-                    ax.Position = [80, ph-j*axh, pw-100, axh-10];
+                    axh = floor((ph-27-15) / nvischannels);
+                    ax.Position = [80, ph-7-j*axh, pw-100, axh-10];
                 end
                 ax.UserData.menuBtn.Position(2) = ...
                     ax.Position(2) + ax.Position(4) - ax.UserData.menuBtn.Position(4);
@@ -915,7 +934,7 @@ updateUI_();
                             if ui.showAverageOnlyBtn.Checked == "off" % show traces
                                 for k = 1:nrows
                                     trace = data.traces(rows(k),channel);
-                                    if ~trace.ismasked
+                                    if ~trace.ismasked % not masked
                                         ax.UserData.traces = [ax.UserData.traces; ...
                                             plot(ax, trace.x, trace.y, 'color', cmap(1+mod(k-1,ncolors),:))];
                                         ax.UserData.rows = [ax.UserData.rows; rows(k)];
@@ -1806,8 +1825,8 @@ end
             end
         end
         updateUI_();
-        autoscale_();
         setSelectedSweeps_(1);
+        autoscale_();
     end
 
     function saveData_(filepath)
