@@ -54,7 +54,8 @@ data.info('notes') = '';
 ui = struct();
 initUI_();
 
-%% custom user init
+%% user init
+loadData_();
 % loadData_('/Users/marcel/Box Sync/Goldschen-Ohm Lab/People/Wagner Nors/data/rGABAAR a1L263T-b2-g2/HEK293T/2019-02-01 T9-30 a1L263T-b2-g2 500ms 1mM PTX alt pipes A and B.mat');
 
 %% test data
