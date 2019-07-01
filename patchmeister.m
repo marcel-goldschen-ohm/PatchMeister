@@ -1278,6 +1278,9 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
             btn.Checked = 'on';
         end
         refresh_();
+        if btn.Text == "Show Raw"
+            autoscale_();
+        end
     end
 
 function UNUSED_createViewControls_()
