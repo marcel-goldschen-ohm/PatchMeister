@@ -58,18 +58,18 @@ initUI_();
 % loadData_('/Users/marcel/Box Sync/Goldschen-Ohm Lab/People/Wagner Nors/data/rGABAAR a1L263T-b2-g2/HEK293T/2019-02-01 T9-30 a1L263T-b2-g2 500ms 1mM PTX alt pipes A and B.mat');
 
 %% test data
-data.traces = repmat(template.trace, [5,2]);
-data.groupids = [1; 1; 1; 2; 2];
-data.grouplabels = {'Group 1', 'Group 2'};
-for i_ = 1:size(data.traces,1)
-    for j_ = 1:size(data.traces,2)
-        data.traces(i_,j_).x = [1:100]';
-        data.traces(i_,j_).y = rand(100,1) .* 10000;
-    end
-end
-data.xlabels = {'Time', 'ms'};
-data.ylabels = {'Current', 'pA'; 'Voltage', 'mV'};
-updateUI_();
+% data.traces = repmat(template.trace, [5,2]);
+% data.groupids = [1; 1; 1; 2; 2];
+% data.grouplabels = {'Group 1', 'Group 2'};
+% for i_ = 1:size(data.traces,1)
+%     for j_ = 1:size(data.traces,2)
+%         data.traces(i_,j_).x = [1:100]';
+%         data.traces(i_,j_).y = rand(100,1) .* 10000;
+%     end
+% end
+% data.xlabels = {'Time', 'ms'};
+% data.ylabels = {'Current', 'pA'; 'Voltage', 'mV'};
+% updateUI_();
 
 %% trace data
     function [x,y] = getTrace_(trace)
