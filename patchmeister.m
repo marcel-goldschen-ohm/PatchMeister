@@ -243,12 +243,19 @@ updateUI_();
         for i = 1:numel(ax)
             rows = ax(i).UserData.rows;
             channel = ax(i).UserData.channel;
-            [data.traces(rows,channel).y0] = deal(y0);
+            if ui.showRawBtn.Checked == "on"
+                [data.traces(rows,channel).y0] = deal(y0);
+            else
+                for j = 1:numel(rows)
+                    data.traces(rows(j),channel).y0 = ...
+                        data.traces(rows(j),channel).y0 - y0;
+                end
+            end
         end
         redraw_();
     end
 
-    function shiftBaselineVisibleTraces_(ax, dy0)
+function UNUSED_shiftBaselineVisibleTraces_(ax, dy0)
         if ~exist('ax', 'var') || isempty(ax)
             ax = vertcat(ui.groups.ax);
         end
@@ -280,7 +287,13 @@ updateUI_();
                     row = ax(i).UserData.rows(j);
                     channel = ax(i).UserData.channel;
                     trace = data.traces(row,channel);
-                    data.traces(row,channel).y0 = mean(trace.y(brushdata));
+                    if ui.showRawBtn.Checked == "on"
+                        data.traces(row,channel).y0 = mean(trace.y(brushdata));
+                    else
+                        [x,y] = getTrace_(trace);
+                        data.traces(row,channel).y0 = ...
+                            trace.y0 + mean(y(brushdata));
+                    end
                     didit = true;
                 end
             end
@@ -307,17 +320,28 @@ updateUI_();
                     if numel(dsel) == 1
                         selpts1 = selpts(1:dsel);
                         selpts2 = selpts(dsel+1:end);
-                        sweep = ax(i).UserData.sweeps(j);
                         row = ax(i).UserData.rows(j);
                         channel = ax(i).UserData.channel;
                         trace = data.traces(row,channel);
-                        x1 = mean(trace.x(selpts1));
-                        y1 = mean(trace.y(selpts1));
-                        x2 = mean(trace.x(selpts2));
-                        y2 = mean(trace.y(selpts2));
-                        m = (y2 - y1) / (x2 - x1);
-                        npts = numel(trace.y);
-                        data.traces(row,channel).y0 = m .* (trace.x - x1) + y1;
+                        if ui.showRawBtn.Checked == "on"
+                            x1 = mean(trace.x(selpts1));
+                            y1 = mean(trace.y(selpts1));
+                            x2 = mean(trace.x(selpts2));
+                            y2 = mean(trace.y(selpts2));
+                            m = (y2 - y1) / (x2 - x1);
+                            npts = numel(trace.y);
+                            data.traces(row,channel).y0 = m .* (trace.x - x1) + y1;
+                        else
+                            [x,y] = getTrace_(trace);
+                            x1 = mean(x(selpts1));
+                            y1 = mean(y(selpts1));
+                            x2 = mean(x(selpts2));
+                            y2 = mean(y(selpts2));
+                            m = (y2 - y1) / (x2 - x1);
+                            npts = numel(y);
+                            data.traces(row,channel).y0 = ...
+                                data.traces(row,channel).y0 + m .* (x - x1) + y1;
+                        end
                         didit = true;
                     end
                 end
@@ -405,6 +429,15 @@ updateUI_();
             'Units', 'normalized', ...
             'Position', [0, 0, 1, 0.33], ...
             'Callback', @(s,e) baselineSplineVisibleTraces_(ax));
+        if ui.showRawBtn.Checked == "off"
+            ui.showRawBtn.Checked = 'on';
+            ui.showBaselineBtn.Checked = 'on';
+            refresh_();
+            autoscale_();
+        elseif ui.showBaselineBtn.Checked == "off"
+            ui.showBaselineBtn.Checked = 'on';
+            redraw_();
+        end
     end
 
     function setScaleVisibleTraces_(ax, yscale)
@@ -419,12 +452,19 @@ updateUI_();
         for i = 1:numel(ax)
             rows = ax(i).UserData.rows;
             channel = ax(i).UserData.channel;
-            [data.traces(rows,channel).yscale] = deal(yscale);
+            if ui.showRawBtn.Checked == "on"
+                [data.traces(rows,channel).yscale] = deal(yscale);
+            else
+                for j = 1:numel(rows)
+                    data.traces(rows(j),channel).yscale = ...
+                        data.traces(rows(j),channel).yscale .* yscale;
+                end
+            end
         end
         redraw_();
     end
 
-    function scaleVisibleTraces_(ax, yscale)
+function UNUSED_scaleVisibleTraces_(ax, yscale)
         if ~exist('ax', 'var') || isempty(ax)
             ax = vertcat(ui.groups.ax);
         end
@@ -455,8 +495,12 @@ updateUI_();
                     row = ax(i).UserData.rows(j);
                     channel = ax(i).UserData.channel;
                     trace = data.traces(row,channel);
-                    [x,y] = getTrace_(trace);
-                    data.traces(row,channel).yscale = trace.yscale ./ max(y(selpts));
+                    if ui.showRawBtn.Checked == "on"
+                        data.traces(row,channel).yscale = 1.0 / max(trace.y(selpts));
+                    else
+                        [x,y] = getTrace_(trace);
+                        data.traces(row,channel).yscale = trace.yscale ./ max(y(selpts));
+                    end
                     didit = true;
                 end
             end
@@ -482,8 +526,12 @@ updateUI_();
                     row = ax(i).UserData.rows(j);
                     channel = ax(i).UserData.channel;
                     trace = data.traces(row,channel);
-                    [x,y] = getTrace_(trace);
-                    data.traces(row,channel).yscale = trace.yscale ./ abs(min(y(selpts)));
+                    if ui.showRawBtn.Checked == "on"
+                        data.traces(row,channel).yscale = 1.0 / abs(min(trace.y(selpts)));
+                    else
+                        [x,y] = getTrace_(trace);
+                        data.traces(row,channel).yscale = trace.yscale ./ abs(min(y(selpts)));
+                    end
                     didit = true;
                 end
             end
@@ -509,8 +557,12 @@ updateUI_();
                     row = ax(i).UserData.rows(j);
                     channel = ax(i).UserData.channel;
                     trace = data.traces(row,channel);
-                    [x,y] = getTrace_(trace);
-                    data.traces(row,channel).yscale = trace.yscale ./ max(abs(y(selpts)));
+                    if ui.showRawBtn.Checked == "on"
+                        data.traces(row,channel).yscale = 1.0 / max(abs(trace.y(selpts)));
+                    else
+                        [x,y] = getTrace_(trace);
+                        data.traces(row,channel).yscale = trace.yscale ./ max(abs(y(selpts)));
+                    end
                     didit = true;
                 end
             end
@@ -535,7 +587,14 @@ updateUI_();
         for i = 1:numel(ax)
             rows = ax(i).UserData.rows;
             channel = ax(i).UserData.channel;
-            [data.traces(rows,channel).x0] = deal(x0);
+            if ui.showRawBtn.Checked == "on"
+                [data.traces(rows,channel).x0] = deal(x0);
+            else
+                for j = 1:numel(rows)
+                    data.traces(rows(j),channel).x0 = ...
+                        data.traces(rows(j),channel).x0 + x0;
+                end
+            end
         end
         redraw_();
     end
@@ -564,7 +623,12 @@ updateUI_();
                     row = ax(i).UserData.rows(j);
                     channel = ax(i).UserData.channel;
                     trace = data.traces(row,channel);
-                    [x,y] = getTrace_(trace);
+                    if ui.showRawBtn.Checked == "on"
+                        x = trace.x;
+                        y = trace.y;
+                    else
+                        [x,y] = getTrace_(trace);
+                    end
                     y = y - mean(y(selpts));
                     threshold = xSD * std(y(selpts));
                     if direction == "Absolute Value"
@@ -574,7 +638,7 @@ updateUI_();
                     elseif direction == "Negative"
                         ind = find(y(selpts(end)+1:end) < -threshold, 1);
                     end
-                    data.traces(row,channel).x0 = trace.x0 + trace.x(selpts(end) + ind);
+                    data.traces(row,channel).x0 = trace.x(selpts(end) + ind);
                     didit = true;
                 end
             end
@@ -704,9 +768,9 @@ updateUI_();
             [data.traces(rows,channel).x0] = deal(0);
             [data.traces(rows,channel).y0] = deal(0);
             [data.traces(rows,channel).yscale] = deal(1);
-            [data.traces(rows,channel).ismasked] = deal([]);
-            [data.traces(rows,channel).iszeroed] = deal([]);
-            [data.traces(rows,channel).isinterpolated] = deal([]);
+            [data.traces(rows,channel).masked] = deal([]);
+            [data.traces(rows,channel).zeroed] = deal([]);
+            [data.traces(rows,channel).interpolated] = deal([]);
         end
         refresh_();
     end
