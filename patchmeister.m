@@ -31,6 +31,7 @@ template.trace.ismasked = false; % 1x1 logical flag for masking entire trace
 template.trace.masked = []; % Tx1 logical for masked data points
 template.trace.zeroed = []; % Tx1 logical for zeroed data points
 template.trace.interpolated = []; % Tx1 logical for interpolated segments
+template.trace.timestamp = NaT;
 
 % Each column is a channel (e.g. current, voltage, etc.)
 % Each row is a sweep - a single data trace for each channel.
@@ -55,7 +56,6 @@ ui = struct();
 initUI_();
 
 %% user init
-loadData_();
 % loadData_('/Users/marcel/Box Sync/Goldschen-Ohm Lab/People/Wagner Nors/data/rGABAAR a1L263T-b2-g2/HEK293T/2019-02-01 T9-30 a1L263T-b2-g2 500ms 1mM PTX alt pipes A and B.mat');
 
 %% test data
@@ -1128,6 +1128,17 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
 
         uimenu(menu, ...
             'Separator', 'on', ...
+            'Text', 'Load HEKA Data', ...
+            'MenuSelectedFcn', @(s,e) loadHEKA_());
+        uimenu(menu, ...
+            'Text', 'Load Axon ABF Data', ...
+            'MenuSelectedFcn', @(s,e) loadABF_());
+        uimenu(menu, ...
+            'Text', 'Load Axograph Data', ...
+            'MenuSelectedFcn', @(s,e) loadAxograph_());
+
+        uimenu(menu, ...
+            'Separator', 'on', ...
             'Text', 'Edit Patch Info', ...
             'MenuSelectedFcn', @(s,e) editInfo_());
         uimenu(menu, ...
@@ -1806,6 +1817,19 @@ function UNUSED_traceXYTableCellEdited_(~, celldata)
 end
 
 %% i/o
+    function clearData_()
+        data.traces = repmat(template.trace, [0,0]);
+        data.xlabels = {};
+        data.ylabels = {};
+        data.groupids = [];
+        data.grouplabels = {};
+        data.info('date') = datestr(now, 'yyyy-mm-dd');
+        data.info('patchid') = '';
+        data.info('construct') = '';
+        data.info('experiment') = '';
+        data.info('notes') = '';
+    end
+
     function loadData_(filepath)
         if ~exist('filepath', 'var') || isempty(filepath)
             [file, path] = uigetfile(fullfile(ui.path, '*.*'), 'Open data file.');
@@ -1813,84 +1837,525 @@ end
             filepath = fullfile(path, file);
         end
         [ui.path, file, ext] = fileparts(filepath);
-        if ext == ".mat"
-            wb = waitbar(0, 'Loading data file...');
-            tmp = load(filepath);
-            close(wb);
-            file = strrep(file, '_', ' ');
-            if isfield(tmp, 'data') % assume PatchMeister .mat file
-                data.info = tmp.data.info;
-                if ~isKey(data.info, 'notes')
-                    data.info('notes') = '';
-                end
-                data.traces = repmat(template.trace, size(tmp.data.traces));
-                for i = 1:size(tmp.data.traces,1)
-                    for j = 1:size(tmp.data.traces,2)
-                        data.traces(i,j).x = tmp.data.traces(i,j).x;
-                        data.traces(i,j).y = tmp.data.traces(i,j).y;
-                        data.traces(i,j).x0 = tmp.data.traces(i,j).x0;
-                        data.traces(i,j).y0 = tmp.data.traces(i,j).y0;
-                        data.traces(i,j).yscale = tmp.data.traces(i,j).yscale;
-                        data.traces(i,j).ismasked = tmp.data.traces(i,j).ismasked;
-                        if isfield(tmp.data.traces, 'masked')
-                            data.traces(i,j).masked = tmp.data.traces(i,j).masked;
-                        end
-                        if isfield(tmp.data.traces, 'zeroed')
-                            data.traces(i,j).zeroed = tmp.data.traces(i,j).zeroed;
-                        end
-                        if isfield(tmp.data.traces, 'interpolated')
-                            data.traces(i,j).interpolated = tmp.data.traces(i,j).interpolated;
-                        end
+        if ext ~= ".mat"; return; end
+        wb = waitbar(0, 'Loading data file...');
+        tmp = load(filepath);
+        close(wb);
+        file = strrep(file, '_', ' ');
+        if isfield(tmp, 'data') % assume PatchMeister .mat file
+            data.info = tmp.data.info;
+            if ~isKey(data.info, 'notes')
+                data.info('notes') = '';
+            end
+            data.traces = repmat(template.trace, size(tmp.data.traces));
+            for i = 1:size(tmp.data.traces,1)
+                for j = 1:size(tmp.data.traces,2)
+                    data.traces(i,j).x = tmp.data.traces(i,j).x;
+                    data.traces(i,j).y = tmp.data.traces(i,j).y;
+                    data.traces(i,j).x0 = tmp.data.traces(i,j).x0;
+                    data.traces(i,j).y0 = tmp.data.traces(i,j).y0;
+                    data.traces(i,j).yscale = tmp.data.traces(i,j).yscale;
+                    data.traces(i,j).ismasked = tmp.data.traces(i,j).ismasked;
+                    if isfield(tmp.data.traces, 'masked')
+                        data.traces(i,j).masked = tmp.data.traces(i,j).masked;
+                    end
+                    if isfield(tmp.data.traces, 'zeroed')
+                        data.traces(i,j).zeroed = tmp.data.traces(i,j).zeroed;
+                    end
+                    if isfield(tmp.data.traces, 'interpolated')
+                        data.traces(i,j).interpolated = tmp.data.traces(i,j).interpolated;
                     end
                 end
-                if isfield(tmp.data, 'xlabels')
-                    data.xlabels = tmp.data.xlabels;
-                elseif isfield(tmp.data, 'units')
-                    data.xlabels = {'Time', tmp.data.units{1}};
-                else
-                    data.xlabels = {'Time', 's'};
-                end
-                if isfield(tmp.data, 'ylabels')
-                    data.ylabels = tmp.data.ylabels;
-                elseif isfield(tmp.data, 'units')
-                    data.ylabels = {'Current', tmp.data.units{2}};
-                else
-                    data.ylabels = {'Current', 'pA'};
-                end
-                if isfield(tmp.data, 'groupids')
-                    data.groupids = tmp.data.groupids;
-                elseif isfield(tmp.data.traces, 'groupid')
-                    data.groupids = vertcat(tmp.data.traces.groupid);
-                else
-                    data.groupids = [1:size(data.traces,1)]';
-                end
-                if isfield(tmp.data, 'grouplabels')
-                    data.grouplabels = tmp.data.grouplabels;
-                elseif isfield(tmp.data, 'groupnames')
-                    data.grouplabels = tmp.data.groupnames;
-                else
-                    data.grouplabels = {};
-                end
-            else % assume PatchMaster .mat file export
-                traceLabels = fieldnames(tmp);
-                ntraces = numel(traceLabels);
-                data.traces = repmat(template.trace, [ntraces, 1]);
-                for i = 1:ntraces
-                    xy = tmp.(traceLabels{i});
-                    data.traces(i,1).x = xy(:,1);
-                    data.traces(i,1).y = xy(:,2) .* 1e12; % A -> pA
-                end
-                data.xlabels = {'Time', 's'};
-                data.ylabels = {'Current', 'pA'};
-                data.groupids = [1:ntraces]';
-                data.grouplabels = {};
-                ind = strfind(file, ' ');
-                ind = [ind, repmat(length(file) + 1, [1, 3])];
-                data.info('date') = file(1:ind(1) - 1);
-                data.info('patchid') = file(ind(1) + 1:ind(2) - 1);
-                data.info('construct') = file(ind(2) + 1:ind(3) - 1);
-                data.info('experiment') = file(ind(3) + 1:end);
             end
+            if isfield(tmp.data, 'xlabels')
+                data.xlabels = tmp.data.xlabels;
+            elseif isfield(tmp.data, 'units')
+                data.xlabels = {'Time', tmp.data.units{1}};
+            else
+                data.xlabels = {'Time', 's'};
+            end
+            if isfield(tmp.data, 'ylabels')
+                data.ylabels = tmp.data.ylabels;
+            elseif isfield(tmp.data, 'units')
+                data.ylabels = {'Current', tmp.data.units{2}};
+            else
+                data.ylabels = {'Current', 'pA'};
+            end
+            if isfield(tmp.data, 'groupids')
+                data.groupids = tmp.data.groupids;
+            elseif isfield(tmp.data.traces, 'groupid')
+                data.groupids = vertcat(tmp.data.traces.groupid);
+            else
+                data.groupids = [1:size(data.traces,1)]';
+            end
+            if isfield(tmp.data, 'grouplabels')
+                data.grouplabels = tmp.data.grouplabels;
+            elseif isfield(tmp.data, 'groupnames')
+                data.grouplabels = tmp.data.groupnames;
+            else
+                data.grouplabels = {};
+            end
+        else % assume PatchMaster .mat file export
+            traceLabels = fieldnames(tmp);
+            ntraces = numel(traceLabels);
+            data.traces = repmat(template.trace, [ntraces,1]);
+            for i = 1:ntraces
+                xy = tmp.(traceLabels{i});
+                data.traces(i,1).x = xy(:,1);
+                data.traces(i,1).y = xy(:,2) .* 1e12; % A -> pA
+            end
+            data.xlabels = {'Time', 's'};
+            data.ylabels = {'Current', 'pA'};
+            data.groupids = [1:ntraces]';
+            data.grouplabels = {};
+            ind = strfind(file, ' ');
+            ind = [ind, repmat(length(file) + 1, [1, 3])];
+            data.info('date') = file(1:ind(1) - 1);
+            data.info('patchid') = file(ind(1) + 1:ind(2) - 1);
+            data.info('construct') = file(ind(2) + 1:ind(3) - 1);
+            data.info('experiment') = file(ind(3) + 1:end);
+        end
+        updateUI_();
+        setSelectedSweeps_(1);
+        autoscale_();
+    end
+
+    function loadHEKA_(filepath)
+        if ~exist('filepath', 'var') || isempty(filepath)
+            [file, path] = uigetfile(fullfile(ui.path, '*.*'), 'Open HEKA data file.');
+            if isequal(file, 0); return; end
+            filepath = fullfile(path, file);
+        end
+        [ui.path, file, ext] = fileparts(filepath);
+        try
+            ishekaimporter = false;
+            heka = HEKA_Importer(filepath);
+            ishekaimporter = true;
+            clearData_();
+            nrecordings = size(heka.RecTable,1);
+            % info for each recording are in the nonempty leaves of dataTree
+            recdata = heka.trees.dataTree(:,end);
+            clip = [];
+            for i = 1:numel(recdata)
+                if isempty(recdata{i}); clip = [clip i]; end
+            end
+            recdata(clip) = [];
+            if numel(recdata) ~= nrecordings
+                clearData_();
+                error('Unexpected data structure. Please report this error.');
+                return;
+            end
+            % use stimulus label to split into groups
+            for rec = 1:nrecordings
+                stimulus(rec) = string(heka.RecTable.Stimulus{rec});
+            end
+            ustimulus = unique(stimulus);
+            for i = 1:numel(ustimulus)
+                data.grouplabels{i} = char(ustimulus(i));
+            end
+            % trace data
+            for rec = 1:nrecordings
+                nchannels = numel(heka.RecTable.dataRaw{rec});
+                if ~isempty(data.traces) && size(data.traces,2) ~= nchannels
+                    clearData_();
+                    error('File contains recordings with different numbers of channels, which is not currently supported in Patch Meister.');
+                    return;
+                end
+                nsweeps = size(heka.RecTable.dataRaw{rec}{1},2);
+                npts = size(heka.RecTable.dataRaw{rec}{1},1);
+                traces = repmat(template.trace, [nsweeps,nchannels]);
+                for sweep = 1:nsweeps
+                    for channel = 1:nchannels
+                        if sweep == 1 && channel == 1
+                            traces(sweep,channel).x = [0:npts-1]' .* recdata{rec}.TrXInterval;
+                        else
+                            traces(sweep,channel).x = traces(1,1).x;
+                        end
+                        traces(sweep,channel).y = heka.RecTable.dataRaw{rec}{channel}(:,sweep);
+                        traces(sweep,channel).timestamp = heka.RecTable.TimeStamp{rec}(sweep);
+                    end
+                end
+                data.traces = [data.traces; traces];
+                data.groupids = [data.groupids; repmat(find(ustimulus == stimulus(rec)), [nsweeps,1])];
+                if rec == 1
+                    data.xlabels = {'Time', heka.RecTable.TimeUnit{rec}{1}};
+                    data.ylabels = {};
+                    for channel = 1:nchannels
+                        data.ylabels{channel,1} = heka.RecTable.ChName{rec}{channel};
+                        data.ylabels{channel,2} = heka.RecTable.ChUnit{rec}{channel};
+                    end
+                end
+                for channel = 1:nchannels
+                    if data.xlabels{2} ~= string(heka.RecTable.TimeUnit{rec}{channel})
+                        clearData_();
+                        error('Traces have different time units, which is not currently supported in Patch Meister.');
+                        return;
+                    end
+                    if data.ylabels{channel,1} ~= string(heka.RecTable.ChName{rec}{channel})
+                        clearData_();
+                        error('Traces have different channel labels, which is not currently supported in Patch Meister.');
+                        return;
+                    end
+                    if data.ylabels{channel,2} ~= string(heka.RecTable.ChUnit{rec}{channel})
+                        clearData_();
+                        error('Traces have different channel units, which is not supported in Patch Meister.');
+                        return;
+                    end
+                end
+            end % rec
+            %timestamps = vertcat(data.traces(:,1).timestamp)
+            %[~,ind] = sort(timestamps)
+        catch
+            if ~ishekaimporter
+                msgbox("!!! Requires package 'HEKA Patchmaster Importer'. Find in MATLAB's Add-On Explorer.", ...
+                    'HEKA file loader');
+            else
+                msgbox("!!! Failed to load HEKA file. Please report error.", ...
+                    'HEKA file loader');
+            end
+            return;
+        end
+        updateUI_();
+        setSelectedSweeps_(1);
+        autoscale_();
+    end
+
+    function loadABF_(filepath)
+        if ~exist('filepath', 'var') || isempty(filepath)
+            [file, path] = uigetfile(fullfile(ui.path, '*.*'), 'Open ABF or ABF2 data file.');
+            if isequal(file, 0); return; end
+            filepath = fullfile(path, file);
+        end
+        [ui.path, file, ext] = fileparts(filepath);
+        try
+            isabfload = false;
+            [d,si,h] = abfload(filepath); % data, sample interval (us), header
+            isabfload = true;
+            if iscell(d)
+                nrows = numel(d);
+                nchannels = size(d{1},2); % should be the same for all rows
+                data.traces = repmat(template.trace, [nrows,nchannels]);
+                for i = 1:nrows
+                    npts = size(d{i},1);
+                    for j = 1:nchannels
+                        if j == 1
+                            data.traces(i,j).x = [1:npts]' .* (si * 1e-3); % time (ms)
+                        else
+                            data.traces(i,j).x = data.traces(i,1).x;
+                        end
+                        data.traces(i,j).y = d{i}(:,j);
+                    end
+                end
+            else
+                nrows = size(d,3);
+                nchannels = size(d,2);
+                npts = size(d,1);
+                data.traces = repmat(template.trace, [nrows,nchannels]);
+                for i = 1:nrows
+                    for j = 1:nchannels
+                        if i == 1 && j == 1
+                            data.traces(i,j).x = [1:npts]' .* (si * 1e-3); % time (ms)
+                        else
+                            data.traces(i,j).x = data.traces(1,1).x;
+                        end
+                        data.traces(i,j).y = d(:,j,i);
+                    end
+                end
+            end
+            data.xlabels = {'Time', 'ms'};
+            data.ylabels = {};
+            for i = 1:nchannels
+                data.ylabels{i,1} = char(h.recChNames(i));
+                data.ylabels{i,2} = char(h.recChUnits(i));
+            end
+            data.groupids = ones([nrows,1], 'uint32');
+            data.grouplabels = {};
+            data.info('date') = datestr(now, 'yyyy-mm-dd');
+            data.info('patchid') = '';
+            data.info('construct') = '';
+            data.info('experiment') = '';
+            data.info('notes') = '';
+        catch
+            if ~isabfload
+                msgbox("!!! Requires package 'fcollman/abfload'. Find in MATLAB's Add-On Explorer.", ...
+                    'pCLAMP ABF file loader');
+            else
+                msgbox("!!! Failed to load ABF file. Please report error.", ...
+                    'pCLAMP ABF file loader');
+            end
+            return;
+        end
+        updateUI_();
+        setSelectedSweeps_(1);
+        autoscale_();
+    end
+
+    function loadAxograph_(filepath) 
+        % ------------------------------------------------------------------------
+        % Read and parse an AxoGraph binary file.
+        %
+        % Versions:
+        % 12-12-2000 - Original program by Mathew V. Jones.
+        % 04-01-2006 - Speed significantly increased by removing unnecessary calls
+        %               to fseek() - Marcel Goldschen-Ohm
+        % 02-07-2007 - Updated to read Axograph X file format - MVJones
+        % ------------------------------------------------------------------------
+        
+        % ------------------------------------------------------------------------
+        % FOR ORIGINAL FILE FORMAT DEFINITIONS, INFO and and SAMPLE I/O CODE, see
+        % AxoGraph_ReadWrite.h in the Developer Documentation folder of the AxoGraph installation.
+        % NOTE: There are some errors in those descriptions, so see also files in "Axograph X CORRECT I/O routines"
+        % ------------------------------------------------------------------------
+
+        % ------------------------------------------------------------------------
+        % AxoGraph 4.6 Standard Format
+        % ============================
+        %
+        % Header:
+        % -------
+        %   Byte    Type        Contents
+        %   ----    ----        --------
+        %   0       OSType      AxoGraph file header identifier = 'AxGr'.
+        %   4       Integer     AxoGraph file format version number = 1.
+        %   6       Integer     Number of data columns to follow.
+        % 
+        % Each column:
+        % ------------
+        %   Byte    Type        Contents
+        %   ----    ----        --------
+        %   0       Longint     Number of data points in the column.
+        %   4       String[80]  Column title.
+        %   84      Real*4      1st data point.
+        %   88      Real*4      2nd data point.
+        %   ..      ..          ....
+        % ------------------------------------------------------------------------
+
+        % ------------------------------------------------------------------------
+        % AxoGraph 4.6 Digitized Format
+        % =============================
+        %
+        % Header:
+        % -------
+        %   Byte    Type        Contents
+        %   ----    ----        --------
+        %   0       OSType      AxoGraph file header identifier = 'AxGr'.
+        %   4       Integer     AxoGraph file format version number = 2.
+        %   6       Integer     Number of columns to follow.
+        % 
+        % First column (X data):
+        % ----------------------
+        %   Byte    Type        Contents
+        %   ----    ----        --------
+        %   0       Longint     Number of data points in each of the subsequent columns.
+        %   4       String[80]  Column title.
+        %   84      Real*4      Sample interval.
+        % 
+        % Each subsequent column (Y data):
+        % --------------------------------
+        %   Does NOT start on byte 96 as you might suspect, but actually starts
+        %   on byte 100. Why, I have no idea.
+        %
+        %   Byte    Type        Contents
+        %   ----    ----        --------
+        %   0       Longint     Number of data points in the column.
+        %   4       String[80]  Column title.
+        %   84      Real*4      Scale factor.
+        %   88      Integer*2   1st Data point.
+        %   90      Integer*2   2nd Data point.
+        %   ..      ...         ....
+        % ------------------------------------------------------------------------
+
+        % ------------------------------------------------------------------------
+        % AxoGraph X Data File Format
+        % ===================================
+        % 
+        % Header
+        % ------
+        % Byte  Type        Contents
+        % 0     char[4]     AxoGraph file header identifier = 'AxGx' - same as filename extension
+        % 4     long        AxoGraph X file format ID = a number between 3 (earliest version) and 6 (latest version)
+        % 8     long        Number of columns to follow
+        % 
+        % 
+        % Each column
+        % ----------------------
+        % Byte  Type        Contents
+        % 0     long        Number of points in the column ( columnPoints )
+        % 4     long        Column type 
+        % 8     long        Length of column title in bytes (Unicode - 2 bytes per character)
+        % 12    char*       Column title (Unicode 2 byte per char) - S.I. units should be in brackets e.g. 'Current (pA)'
+        % ??    ??          Byte offset depends on length of column title string. 
+        % ..    ...         Numeric type and layout depend on the column type
+        % ..    ...         etc.
+        % 
+        % Six column types are supported...
+        %   4: short
+        %   5: long
+        %   6: float
+        %   7: double
+        %   9: 'series'
+        %   10: 'scaled short'
+        % 
+        % In the first four column types, data is stored as a simple array of the corresponding type.
+        % The 'scaled short' column type stores data as a 'double' scaling factor and offset, and a 'short' array.
+        % The 'series' column type stores data as a 'double' first value and a 'double' increment.
+        % ------------------------------------------------------------------------
+        
+        if ~exist('filepath', 'var') || isempty(filepath)
+            [file, path] = uigetfile(fullfile(ui.path, '*.*'), 'Open Axograph or AxographX data file.');
+            if isequal(file, 0); return; end
+            filepath = fullfile(path, file);
+        end
+        [ui.path, file, ext] = fileparts(filepath);
+        try
+            fid = fopen(filepath, 'r', 'b');
+            
+            % Make sure it's an Axograph file.
+            S.fileType = fread(fid, 4, 'char');
+            S.fileType = char(S.fileType)';
+            switch S.fileType
+                case 'AxGr'
+                    disp('  This is an AxoGraph 4.x file.'); 
+                    %S.AxGrVersion = '4.x'; 
+                    idformat = 'int16';
+                case 'axgx'
+                    disp('  This is an AxoGraph X file (axgx).'); 
+                    %S.AxGrVersion = 'X'; 
+                    idformat = 'int32';
+                case 'axgd'
+                    disp('  This is an AxoGraph X file (axgd).'); 
+                    %S.AxGrVersion = 'X'; 
+                    idformat = 'int32';
+                otherwise 
+                    error(['Sorry: This is an unrecognized file type. Should be "AxGr" or "axgx" or "axgd". Instead, byte 4 says it is: ' S.fileType]);
+                    return;
+            end
+            
+            % Get file format.
+            S.fileFormat = fread(fid, 1, idformat);
+            disp([' File Format ID# = ' num2str(S.fileFormat)]);
+            if S.fileFormat == 1
+                S.FileDesc = 'Axograph 4.x Standard File'; 
+                disp([' FILE FORMAT = ' S.FileDesc]);
+                numcolsbyteoff = 6;
+            elseif S.fileFormat == 2
+                S.FileDesc = 'Axograph 4.x Digitized File'; 
+                disp([' FILE FORMAT = ' S.FileDesc]);
+                numcolsbyteoff = 6;
+            elseif S.fileFormat >= 3 && S.fileFormat <= 6
+                S.FileDesc = 'Axograph X File'; 
+                disp([' FILE FORMAT = ' S.FileDesc]);
+                numcolsbyteoff = 8;
+            else
+                error(['Sorry: ' num2str(S.fileFormat) ' is an unrecognized file format. Should be 1 (4.x Standard) or 2 (4.x Digitized) or 3-6 (X).']);
+                return;
+            end
+            
+            % Read data.
+            fseek(fid, numcolsbyteoff, -1);
+            S.numColumns = fread(fid, 1, idformat);
+            disp([' NUMBER OF COLUMNS = ' num2str(S.numColumns)]);
+            
+            % AxoGraph 4.x Standard format.
+            if S.fileFormat == 1
+                for aColumn = 1 : S.numColumns
+                    S.columnPts(aColumn)            = fread(fid, 1, 'int32');
+                    S.columnType(aColumn)           = 6;
+                    S.columnTitle{aColumn}          = char( fread(fid, 80, 'char')');
+                    S.columnTitleLength(aColumn)    = length(S.columnTitle{aColumn});          
+                    S.columnTypeName{aColumn}       = 'float';
+                    S.columnTypeFormat{aColumn}     = 'float32';
+                    S.columnScale(aColumn)          = 1;          
+                    S.columnData{aColumn}           = fread(fid, S.columnPts(aColumn), 'real*4');
+                end
+
+            % AxoGraph 4.x Digitized format.
+            elseif S.fileFormat == 2
+                aColumn = 1;
+                    S.columnPts(aColumn)            = fread(fid, 1, 'int32');           % display(['Num Pts = ' num2str(S.columnPts(aColumn))]);
+                    S.columnType(aColumn)           = 6;
+                    S.columnTitle{aColumn}          = char( fread(fid, 80, 'uchar=>uchar')');  % display(['Title = ' S.columnTitle{aColumn}]);
+                    S.columnTitleLength(aColumn)    = length(S.columnTitle{aColumn});          
+                    S.columnTypeName{aColumn}       = 'float';
+                    S.columnTypeFormat{aColumn}     = 'float32';
+                    S.columnScale(aColumn)          = fread(fid, 1, 'real*4');          % display(['Sample Interval = ' num2str(S.columnScale(aColumn))]);
+                    S.columnData{aColumn}           = S.columnScale(aColumn) .* [1:S.columnPts(aColumn)]';
+
+                fseek(fid, 100, 'bof');
+                for aColumn = 2 : S.numColumns
+                    S.columnPts(aColumn)            = fread(fid, 1, 'int32');           % display(['Num Pts = ' num2str(S.columnPts(aColumn))]);
+                    S.columnType(aColumn)           = 6;
+                    S.columnTitle{aColumn}          = char(fread(fid, 80, 'uchar=>uchar')');  % display(['Title = ' S.columnTitle{aColumn}]);
+                    S.columnTitleLength(aColumn)    = length(S.columnTitle{aColumn});          
+                    S.columnScale(aColumn)          = fread(fid, 1, 'real*4');          % display(['Scale Factor = ' num2str(S.columnScale(aColumn))]);
+                    S.columnTypeName{aColumn}       = 'float';
+                    S.columnTypeFormat{aColumn}     = 'float32';
+                    S.columnData{aColumn}           = S.columnScale(aColumn) .* fread(fid, S.columnPts(aColumn), 'integer*2');
+                end
+
+            % AxoGraph X format
+            elseif  S.fileFormat >= 3 && S.fileFormat <= 6
+                for aColumn = 1 : S.numColumns
+                    S.columnPts(aColumn)            = fread(fid, 1, 'int32');           % display(['Num Pts = ' num2str(S.columnPts(aCoumn))]);
+                    S.columnType(aColumn)           = fread(fid, 1, 'int32')';   
+                    S.columnTitleLength(aColumn)    = fread(fid, 1, 'int32');          % In bytes, 2 bytes per character
+                    str                             = char( fread(fid, S.columnTitleLength(aColumn), 'char') );          % In bytes, 2 bytes per character
+                    S.columnTitle{aColumn}          = str(2:2:end)';                                                    % Get rid of dopey blanks
+
+                    switch S.columnType(aColumn)
+                        % Read data according to its format and length
+                        % NOTE: I THINK this will work for all column types, but have
+                        % only tested type 9 and 10
+                        case 4
+                            S.columnTypeName{aColumn}   = 'short';
+                            S.columnTypeFormat{aColumn} = 'int16';
+                            S.columnScale(aColumn)      = 1;          
+                            S.columnData{aColumn}       = fread(fid, S.columnPts(aColumn), S.columnTypeFormat{aColumn});
+                        case 5
+                            S.columnTypeName{aColumn}   = 'long';
+                            S.columnTypeFormat{aColumn} = 'int32';
+                             S.columnScale(aColumn)     = 1;          
+                             S.columnData{aColumn}      = fread(fid, S.columnPts(aColumn), S.columnTypeFormat{aColumn});
+                        case 6
+                            S.columnTypeName{aColumn}   = 'float';
+                            S.columnTypeFormat{aColumn} = 'float';
+                            S.columnScale(aColumn)      = 1;          
+                            S.columnData{aColumn}       = fread(fid, S.columnPts(aColumn), S.columnTypeFormat{aColumn});
+                        case 7
+                            S.columnTypeName{aColumn}   = 'double';
+                            S.columnTypeFormat{aColumn} = 'real*8';
+                            S.columnScale(aColumn)      = 1;          
+                            S.columnData{aColumn}       = fread(fid, S.columnPts(aColumn), S.columnTypeFormat{aColumn});
+                        case 9
+                            S.columnTypeName{aColumn}   = 'series';
+                            S.columnTypeFormat{aColumn} = 'real*8';
+                            seriesinfo                  = fread(fid, 2, S.columnTypeFormat{aColumn});
+                            S.columnScale(aColumn)      = 1;          
+                            S.columnData{aColumn} = seriesinfo(1) + seriesinfo(2).*[1:S.columnPts(aColumn)];
+                        case 10
+                            S.columnTypeName{aColumn}   = 'scaled short';
+                            S.columnTypeFormat{aColumn} = {'real*8'; 'real*8'; 'int16'};
+                            scaling                     = fread(fid, 1, S.columnTypeFormat{aColumn}{1});
+                            offset                      = fread(fid, 1, S.columnTypeFormat{aColumn}{2});
+                            data                        = fread(fid, S.columnPts(aColumn), S.columnTypeFormat{aColumn}{3});
+                            S.columnScale(aColumn)      = 1;          
+                            S.columnData{aColumn}       = scaling.*data + offset;
+                    end
+                end
+            end
+            disp('  ... Done.');
+            % TODO...
+            % split columns into time and channel data based on titles
+%             xcols = [1];
+%             for i = 2:S.numColumns
+%                 if string(S.columnTitle{i}) == string(S.columnTitle{1})
+%                     xcols = [xcols i];
+%                 end
+%             end
+        catch
+            msgbox("!!! Failed to load Axograph or AxographX file. Please report error.", ...
+                'Axograph file loader');
+            return;
         end
         updateUI_();
         setSelectedSweeps_(1);
