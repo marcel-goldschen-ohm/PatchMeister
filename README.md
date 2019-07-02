@@ -19,7 +19,6 @@ Tested with MATLAB R2019a.
 
 ### Capabilites
 * *Import data.*
-    * HEKA PatchMaster MATLAB export (assumes all traces belong to the same patch and experiment).
     * HEKA PatchMaster datafile
     * Molecular Devices pCLAMP datafile (*NOT tested*)
     * :construction: AxoGraph or AxographX datafile
