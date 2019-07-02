@@ -20,8 +20,8 @@ Tested with MATLAB R2019a.
 ### Capabilites
 * *Import data.*
     * HEKA PatchMaster MATLAB export (assumes all traces belong to the same patch and experiment).
-    * :construction: HEKA PatchMaster datafile
-    * :construction: Molecular Devices pCLAMP datafile
+    * HEKA PatchMaster datafile
+    * Molecular Devices pCLAMP datafile (*NOT tested*)
     * :construction: AxoGraph or AxographX datafile
 * *Organize a series of current/voltage/etc vs. time sweeps by splitting them into groups.*
     * View one or more selected channels (e.g. current, voltage, etc.)
@@ -32,7 +32,7 @@ Tested with MATLAB R2019a.
 * *Visually step through a group of sweeps.*
     * Buttons to step forward/backward through a group of sweeps.
     * Optionally show any arbitrary range of selected sweep(s).
-* *Mask sweeps to remove them from any subsequent analyses.*
+* *Mask sweeps to remove them from subsequent analyses.*
    * Masked sweeps are flagged, but NOT deleted.
    * Optionally show or hide masked sweeps.
 * *Basic manipulation of sweep data.*
