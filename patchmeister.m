@@ -2,25 +2,49 @@ function patchmeister()
 %
 % Created by Marcel Goldschen-Ohm <goldschen-ohm@utexas.edu, marcel.goldschen@gmail.com>
 
-%% init
-% for debugging
-global data;
-global ui;
-
-% A trace is a list of (x,y) data points for some measurement vs. time,
-% e.g. as obtained during episodic acquisition in an electrophysiology
-% experiment.
+%% data structures
+% Data is organized into a collection of time series data traces in one or
+% more channels. The traces are arranged as a 2D struct array where each
+% row is a sweep and each column is a channel. See the templates below for
+% details on this data structure.
 %
-% !!! The original raw (x,y) data should NEVER be altered unless you are
-% absolutely sure of what you are doing. Instead, offsets and scale
-% factors, as well as masked, zeroed and interpolated regions are stored
-% separately, and can be used to reconstruct the adjusted (e.g. baselined,
-% scaled, masked, etc.) trace from the raw data.
+% Note: Struct arrays of individual traces were chosen over lumping data
+% into higher dimensional arrays or cell arrays primarily because I feel
+% that this provides a more intuitive interface to the data.
 %
-% Each trace is alloted its own x data to ease grouping traces with
-% differing x values. Note, however, that assigning the x values of one
-% trace to other traces will avoid copying the x data via Matlab's copy on
-% write rules.
+% !!! All traces in a sweep have the same x data and repeated sweeps have
+% the same x/y labels and units. Despite this, each trace is assigned its
+% own x and y data fields as well as their label and unit specifications.
+% The disadvantage of this approach is that it is possible to group traces
+% in a way that violates the idea of sequences of recorded sweeps. However,
+% the advantages of this approach are that it provides an intuitive
+% interface for trace manipulation (e.g. every trace knows about it's own
+% data) and provides for very flexible trace grouping (e.g. can handle
+% inclusion of sweeps where recording was stopped prematurely, or similar
+% stimulus sequences with slightly different recording lengths).
+% Furthermore, it is fairly simple to enforce that all sweeps in a group
+% have the same x data, channels and units (e.g. the deal() function can be
+% used to easily assign labels/units to all traces in a group). Also, this
+% approach does not necessarily mean redundant copying of shared x data.
+% For example, assigning the x values of one trace to other traces will
+% avoid copying the x data via MATLAB's copy on write rules (this will
+% remain true so long as the original raw x values are never edited, see
+% below). Thus, we can have the best of both worlds, intuitive access to x
+% data from within each trace and shared memory to x data for all traces in
+% a group.
+%
+% !!! The original raw (x,y) data in each trace should almost NEVER be
+% altered unless you are absolutely sure of what you are doing. Instead,
+% offsets and scale factors, as well as masked, zeroed and interpolated
+% regions are stored separately, and can be used to reconstruct the
+% adjusted (e.g. baselined, scaled, masked, etc.) trace from the raw data.
+% For such reconstruction, see the interface functions described below.
+% This also means that the original raw data can always be viewed at any
+% time if desired.
+%
+% !!! The function getXY_(...) defined below provides a consistent
+% interface to the trace data, and should be used in all cases rather than
+% accessing the x, y data fields directly.
 
 % A time series trace of (x,y) data points is the basic fundamental unit
 % that we will deal with in this program.
@@ -43,7 +67,7 @@ template.trace.zeroed = []; % Tx1 logical for zeroed data points
 template.trace.interpolated = []; % Tx1 logical for interpolated segments
 
 % A series is a 2D struct array of traces where each column is a channel
-% and each row is a sweep.
+% and each row is a sweep. The UI is setup to view a single series.
 template.series.traces = repmat(template.trace, [0,0]); % SxC data traces, e.g. traces(sweep,channel).y
 % Sweeps can optionally be grouped as desired.
 template.series.groupids = []; % Sx1 group indices for each sweep
@@ -55,7 +79,13 @@ template.series.meta.construct = ''; % construct, e.g. denote subunit compositio
 template.series.meta.experiment = ''; % very short one-line summary of experiment (more detail can go in notes)
 template.series.meta.notes = '';
 
-% data
+%% init
+% for debugging (comment out if you don't want command line access to the
+% data)
+global data;
+global ui;
+
+% data for a single series of sweeps
 data = template.series;
 
 % UI
@@ -63,9 +93,10 @@ ui = struct();
 initUI_();
 
 %% user init
-% loadData_('/Users/marcel/Box Sync/Goldschen-Ohm Lab/People/Wagner Nors/data/rGABAAR a1L263T-b2-g2/HEK293T/2019-02-01 T9-30 a1L263T-b2-g2 500ms 1mM PTX alt pipes A and B.mat');
+% Put any user specific initialization code here...
 
 %% test data
+% This is just some dummy data for testing purposes.
 data.traces = repmat(template.trace, [5,2]);
 for i_ = 1:size(data.traces,1)
     for j_ = 1:size(data.traces,2)
@@ -181,42 +212,66 @@ updateUI_();
     end
 
 %% per axes visible trace manipulations
-    function autoscale_(ax, xy)
+
+    function autoscale_(ax, xy, same)
         if ~exist('ax', 'var') || isempty(ax)
             ax = vertcat(ui.groups.ax);
         end
-        if exist('xy', 'var')
-            if xy == 'x'
-                lims = [];
-                for i = 1:numel(ax)
-                    lims = [lims; axesXYLims_(ax(i))];
+        if ~exist('xy', 'var'); xy = "xy"; end
+        if ~exist('same', 'var'); same = false; end
+        if xy == "x"
+            lims = [];
+            for i = 1:numel(ax)
+                lims = [lims; axesXYLims_(ax(i))];
+            end
+            lims = [min(lims(:,1)), max(lims(:,2))];
+            for i = 1:numel(ax)
+                ax(i).XLim = lims;
+            end
+        elseif xy == "y"
+            lims = [];
+            for i = 1:numel(ax)
+                lims = [lims; axesXYLims_(ax(i))];
+            end
+            if same
+                i = ~isinf(lims(:,3));
+                if any(i)
+                    lims(:,3) = min(lims(i,3));
                 end
-                lims = [min(lims(:,1)), max(lims(:,2))];
-                for i = 1:numel(ax)
-                    ax(i).XLim = lims;
-                end
-            elseif xy == 'y'
-                for i = 1:numel(ax)
-                    lims = axesXYLims_(ax(i));
-                    ax(i).YLim = lims(3:4);
+                i = ~isinf(lims(:,4));
+                if any(i)
+                    lims(:,4) = max(lims(i,4));
                 end
             end
-            return
-        end
-        lims = [];
-        for i = 1:numel(ax)
-            lims = [lims; axesXYLims_(ax(i))];
-        end
-        i = ~isinf(lims(:,1));
-        if any(i)
-            lims(:,1) = min(lims(i,1));
-        end
-        i = ~isinf(lims(:,2));
-        if any(i)
-            lims(:,2) = max(lims(i,2));
-        end
-        for i = 1:numel(ax)
-            axis(ax(i), lims(i,:));
+            for i = 1:numel(ax)
+                ax(i).YLim = lims(i,3:4);
+            end
+        elseif xy == "xy"
+            lims = [];
+            for i = 1:numel(ax)
+                lims = [lims; axesXYLims_(ax(i))];
+            end
+            i = ~isinf(lims(:,1));
+            if any(i)
+                lims(:,1) = min(lims(i,1));
+            end
+            i = ~isinf(lims(:,2));
+            if any(i)
+                lims(:,2) = max(lims(i,2));
+            end
+            if same
+                i = ~isinf(lims(:,3));
+                if any(i)
+                    lims(:,3) = min(lims(i,3));
+                end
+                i = ~isinf(lims(:,4));
+                if any(i)
+                    lims(:,4) = max(lims(i,4));
+                end
+            end
+            for i = 1:numel(ax)
+                axis(ax(i), lims(i,:));
+            end
         end
     end
 
@@ -262,31 +317,14 @@ updateUI_();
             rows = ax(i).UserData.rows;
             channel = ax(i).UserData.channel;
             if ui.showRawBtn.Checked == "on"
+                % set baseline
                 [data.traces(rows,channel).y0] = deal(y0);
             else
+                % shift baseline (i.e. set based on current view)
                 for j = 1:numel(rows)
                     data.traces(rows(j),channel).y0 = ...
                         data.traces(rows(j),channel).y0 - y0;
                 end
-            end
-        end
-        redraw_();
-    end
-
-function UNUSED_shiftBaselineVisibleTraces_(ax, dy0)
-        if ~exist('ax', 'var') || isempty(ax)
-            ax = vertcat(ui.groups.ax);
-        end
-        if ~exist('dy0', 'var')
-            answer = inputdlg('Baseline:', 'Shift Baseline', 1, {'0'});
-            if isempty(answer); return; end
-            dy0 = str2num(answer{1});
-        end
-        for i = 1:numel(ax)
-            rows = ax(i).UserData.rows;
-            channel = ax(i).UserData.channel;
-            for j = 1:numel(rows)
-                data.traces(rows(j),channel).y0 = data.traces(rows(j),channel).y0 - dy0;
             end
         end
         redraw_();
@@ -452,7 +490,7 @@ function UNUSED_shiftBaselineVisibleTraces_(ax, dy0)
 %         end
     end
 
-    function setScaleVisibleTraces_(ax, yscale)
+    function scaleVisibleTraces_(ax, yscale)
         if ~exist('ax', 'var') || isempty(ax)
             ax = vertcat(ui.groups.ax);
         end
@@ -465,30 +503,14 @@ function UNUSED_shiftBaselineVisibleTraces_(ax, dy0)
             rows = ax(i).UserData.rows;
             channel = ax(i).UserData.channel;
             if ui.showRawBtn.Checked == "on"
+                % set scale
                 [data.traces(rows,channel).yscale] = deal(yscale);
             else
+                % multiply current scale
                 for j = 1:numel(rows)
                     data.traces(rows(j),channel).yscale = ...
                         data.traces(rows(j),channel).yscale .* yscale;
                 end
-            end
-        end
-        redraw_();
-    end
-
-function UNUSED_scaleVisibleTraces_(ax, yscale)
-        if ~exist('ax', 'var') || isempty(ax)
-            ax = vertcat(ui.groups.ax);
-        end
-        if ~exist('yscale', 'var')
-            answer = inputdlg('Y Scale:', 'Set Y Scale', 1, {'1'});
-            if isempty(answer); return; end
-            yscale = str2num(answer{1});
-        end
-        for i = 1:numel(ax)
-            rows = ax(i).UserData.rows;
-            for j = 1:numel(rows)
-                data.traces(rows(j),channel).yscale = data.traces(rows(j),channel).yscale .* yscale;
             end
         end
         redraw_();
@@ -597,8 +619,10 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
             rows = ax(i).UserData.rows;
             channel = ax(i).UserData.channel;
             if ui.showRawBtn.Checked == "on"
+                % set time zero
                 [data.traces(rows,channel).x0] = deal(x0);
             else
+                % shift time zero
                 for j = 1:numel(rows)
                     data.traces(rows(j),channel).x0 = ...
                         data.traces(rows(j),channel).x0 + x0;
@@ -797,6 +821,7 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
     end
 
 %% UI
+
     function initUI_()
         ui.mainWindow = figure( ...
             'Name', 'Patch Meister', ...
@@ -1157,13 +1182,16 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
         uimenu(menu, ...
             'Separator', 'on', ...
             'Label', 'Autoscale All XY', ...
-            'Callback', @(s,e) autoscale_([]));
+            'Callback', @(s,e) autoscale_([], "xy"));
         uimenu(menu, ...
             'Label', 'Autoscale All X', ...
-            'Callback', @(s,e) autoscale_([], 'x'));
+            'Callback', @(s,e) autoscale_([], "x"));
         uimenu(menu, ...
             'Label', 'Autoscale All Y', ...
-            'Callback', @(s,e) autoscale_([], 'y'));
+            'Callback', @(s,e) autoscale_([], "y"));
+        uimenu(menu, ...
+            'Label', 'Autoscale All Same Y', ...
+            'Callback', @(s,e) autoscale_([], "y", true));
 
         ui.showRawBtn = uimenu(menu, ...
             'Separator', 'on', ...
@@ -1199,9 +1227,6 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
             'Separator', 'on', ...
             'Label', 'Set Baseline', ...
             'Callback', @(s,e) setBaselineVisibleTraces_(ax));
-%         uimenu(menu, ...
-%             'Label', 'Shift Baseline', ...
-%             'Callback', @(s,e) shiftBaselineVisibleTraces_(ax));
         uimenu(menu, ...
             'Label', 'Baseline Flat', ...
             'Callback', @(s,e) baselineFlatVisibleTraces_(ax));
@@ -1215,10 +1240,7 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
         uimenu(menu, ...
             'Separator', 'on', ...
             'Label', 'Set Y Scale', ...
-            'Callback', @(s,e) setScaleVisibleTraces_(ax));
-%         uimenu(menu, ...
-%             'Label', 'Multiply Y By Scale', ...
-%             'Callback', @(s,e) scaleVisibleTraces_(ax));
+            'Callback', @(s,e) scaleVisibleTraces_(ax));
         uimenu(menu, ...
             'Label', 'Normalize Positive', ...
             'Callback', @(s,e) normalizePositiveVisibleTraces_(ax));
@@ -1577,19 +1599,6 @@ end
                 str = [num2str(range(1)) '-' num2str(range(end))];
             else
                 str = [str ',' num2str(range(1)) '-' num2str(range(end))];
-            end
-        end
-    end
-
-function tf = UNUSED_isSweepMaskedForAllGroups_(sweepind)
-        tf = true;
-        groupuids = unique(data.groupids);
-        for i = 1:numel(ui.groups)
-            groupsweepind = find(data.groupids == groupuids(i));
-            if numel(groupsweepind) >= sweepind ...
-                    && ~isempty(find(horzcat(~data.traces(groupsweepind(sweepind),:).ismasked)))
-                tf = false;
-                return;
             end
         end
     end
