@@ -21,35 +21,42 @@ global ui;
 % differing x values. Note, however, that assigning the x values of one
 % trace to other traces will avoid copying the x data via Matlab's copy on
 % write rules.
-%
+
+% A time series trace of (x,y) data points is the basic fundamental unit
+% that we will deal with in this program.
 template.trace.x = []; % Tx1, e.g. time
 template.trace.y = []; % Tx1, e.g. current, voltage, etc.
+% basic info about the (x,y) data
+template.trace.xlabel = "Time";
+template.trace.xunit = "s";
+template.trace.ylabel = ""; % e.g. "Current"
+template.trace.yunit = ""; % e.g. "pA"
+template.trace.timestamp = NaT; % timestamp for recorded data
+% basic offsets and scaling
 template.trace.x0 = 0; % 1x1 time zero offset
 template.trace.y0 = 0; % 1x1 (uniform) OR Tx1 (nonuniform) baseline offset
 template.trace.yscale = 1; % 1x1 (uniform) OR Tx1 (nonuniform) scale factor
+% optional masking, zeroing and interpolation
 template.trace.ismasked = false; % 1x1 logical flag for masking entire trace
 template.trace.masked = []; % Tx1 logical for masked data points
 template.trace.zeroed = []; % Tx1 logical for zeroed data points
 template.trace.interpolated = []; % Tx1 logical for interpolated segments
-template.trace.timestamp = NaT;
 
-% Each column is a channel (e.g. current, voltage, etc.)
-% Each row is a sweep - a single data trace for each channel.
-template.data.traces = repmat(template.trace, [0,0]); % sweeps x channels
-template.data.xlabels = {}; % e.g. {'Time', 'ms'}
-template.data.ylabels = {}; % (channels x 2), e.g. {'Current', 'pA'; 'Voltage', 'mV'}
-% group sweeps
-template.data.groupids = []; % (sweeps x 1) group index for each sweep
-template.data.grouplabels = {}; % labels for each group
+% A series is a 2D struct array of traces where each column is a channel
+% and each row is a sweep.
+template.series.traces = repmat(template.trace, [0,0]); % SxC data traces, e.g. traces(sweep,channel).y
+% Sweeps can optionally be grouped as desired.
+template.series.groupids = []; % Sx1 group indices for each sweep
+template.series.grouplabels = repmat("", [0,0]); % Gx1 group labels
 % metadata
-template.data.meta.date = datestr(now, 'yyyy-mm-dd');
-template.data.meta.patchid = ''; % cell/patch ID
-template.data.meta.construct = ''; % construct, e.g. denote subunit composition and mutations
-template.data.meta.experiment = ''; % very short one-line summary of experiment (more detail can go in notes)
-template.data.meta.notes = '';
+template.series.meta.date = datestr(now, 'yyyy-mm-dd');
+template.series.meta.patchid = ''; % cell/patch ID
+template.series.meta.construct = ''; % construct, e.g. denote subunit composition and mutations
+template.series.meta.experiment = ''; % very short one-line summary of experiment (more detail can go in notes)
+template.series.meta.notes = '';
 
 % data
-data = template.data;
+data = template.series;
 
 % UI
 ui = struct();
@@ -59,18 +66,20 @@ initUI_();
 % loadData_('/Users/marcel/Box Sync/Goldschen-Ohm Lab/People/Wagner Nors/data/rGABAAR a1L263T-b2-g2/HEK293T/2019-02-01 T9-30 a1L263T-b2-g2 500ms 1mM PTX alt pipes A and B.mat');
 
 %% test data
-% data.traces = repmat(template.trace, [5,2]);
-% data.groupids = [1; 1; 1; 2; 2];
-% data.grouplabels = {'Group 1', 'Group 2'};
-% for i_ = 1:size(data.traces,1)
-%     for j_ = 1:size(data.traces,2)
-%         data.traces(i_,j_).x = [1:100]';
-%         data.traces(i_,j_).y = rand(100,1) .* 10000;
-%     end
-% end
-% data.xlabels = {'Time', 'ms'};
-% data.ylabels = {'Current', 'pA'; 'Voltage', 'mV'};
-% updateUI_();
+data.traces = repmat(template.trace, [5,2]);
+for i_ = 1:size(data.traces,1)
+    for j_ = 1:size(data.traces,2)
+        data.traces(i_,j_).x = [0:99]';
+        data.traces(i_,j_).y = rand(100,1) .* 10000;
+    end
+end
+[data.traces(:,1).ylabel] = deal("Current");
+[data.traces(:,2).ylabel] = deal("Voltage");
+[data.traces(:,1).yunit] = deal("pA");
+[data.traces(:,2).yunit] = deal("mV");
+data.groupids = [1; 1; 1; 2; 2];
+data.grouplabels = ["Group 1"; "Group 2"];
+updateUI_();
 
 %% trace data
     function [x,y] = getTrace_(trace)
@@ -855,7 +864,7 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
         ngroups = getNumGroups_();
         nchannels = getNumChannels_();
         % update visible channels
-        ui.visibleChannels.String = data.ylabels(:,1);
+        ui.visibleChannels.String = cellstr(horzcat(data.traces(1,:).ylabel));
         ui.visibleChannels.Min = 0;
         ui.visibleChannels.Max = nchannels;
         if isempty(ui.visibleChannels.Value)
@@ -886,10 +895,10 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
                 if i ~= ngroups || j ~= nvischannels
                     xlabel(ax, '');
                 else
-                    xlabel(ax, [data.xlabels{1} ' (' data.xlabels{2} ')']);
+                    xlabel(ax, [char(data.traces(1,1).xlabel) ' (' char(data.traces(1,1).xunit) ')']);
                 end
                 ylabel(ax, {getGroupLabel_(i); ...
-                    [data.ylabels{channel,1} ' (' data.ylabels{channel,2} ')']});
+                    [char(data.traces(channel,1).ylabel) ' (' char(data.traces(channel,1).yunit) ')']});
                 % axes context menu
                 ax.UserData.menu = createAxesMenu_(ax);
                 ax.UIContextMenu = ax.UserData.menu;
@@ -1818,7 +1827,7 @@ end
 
 %% i/o
     function clearData_()
-        data = template.data;
+        data = template.series;
     end
 
     function loadData_(filepath)
@@ -1853,21 +1862,27 @@ end
                     if isfield(tmp.data.traces, 'interpolated')
                         data.traces(i,j).interpolated = tmp.data.traces(i,j).interpolated;
                     end
+                    if isfield(tmp.data.traces, 'xlabel')
+                        data.traces(i,j).xlabel = tmp.data.traces(i,j).xlabel;
+                    elseif isfield(tmp.data, 'xlabels')
+                        data.traces(i,j).xlabel = string(tmp.data.xlabels{1});
+                    end
+                    if isfield(tmp.data.traces, 'xunit')
+                        data.traces(i,j).xunit = tmp.data.traces(i,j).xunit;
+                    elseif isfield(tmp.data, 'xlabels')
+                        data.traces(i,j).xunit = string(tmp.data.xlabels{2});
+                    end
+                    if isfield(tmp.data.traces, 'ylabel')
+                        data.traces(i,j).ylabel = tmp.data.traces(i,j).ylabel;
+                    elseif isfield(tmp.data, 'ylabels')
+                        data.traces(i,j).ylabel = string(tmp.data.ylabels{j,1});
+                    end
+                    if isfield(tmp.data.traces, 'yunit')
+                        data.traces(i,j).yunit = tmp.data.traces(i,j).yunit;
+                    elseif isfield(tmp.data, 'ylabels')
+                        data.traces(i,j).yunit = string(tmp.data.ylabels{j,2});
+                    end
                 end
-            end
-            if isfield(tmp.data, 'xlabels')
-                data.xlabels = tmp.data.xlabels;
-            elseif isfield(tmp.data, 'units')
-                data.xlabels = {'Time', tmp.data.units{1}};
-            else
-                data.xlabels = {'Time', 's'};
-            end
-            if isfield(tmp.data, 'ylabels')
-                data.ylabels = tmp.data.ylabels;
-            elseif isfield(tmp.data, 'units')
-                data.ylabels = {'Current', tmp.data.units{2}};
-            else
-                data.ylabels = {'Current', 'pA'};
             end
             if isfield(tmp.data, 'groupids')
                 data.groupids = tmp.data.groupids;
@@ -1877,11 +1892,11 @@ end
                 data.groupids = [1:size(data.traces,1)]';
             end
             if isfield(tmp.data, 'grouplabels')
-                data.grouplabels = tmp.data.grouplabels;
+                data.grouplabels = string(tmp.data.grouplabels);
             elseif isfield(tmp.data, 'groupnames')
-                data.grouplabels = tmp.data.groupnames;
+                data.grouplabels = string(tmp.data.groupnames);
             else
-                data.grouplabels = {};
+                data.grouplabels = repmat("", [0,0]);
             end
             if isfield(tmp.data, 'meta') && isfield(tmp.data.meta, 'date')
                 data.meta.date = tmp.data.meta.date;
