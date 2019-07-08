@@ -97,20 +97,21 @@ initUI_();
 
 %% test data
 % This is just some dummy data for testing purposes.
-data.traces = repmat(template.trace, [5,2]);
-for i_ = 1:size(data.traces,1)
-    for j_ = 1:size(data.traces,2)
-        data.traces(i_,j_).x = [0:99]';
-        data.traces(i_,j_).y = rand(100,1) .* 10000;
-    end
-end
-[data.traces(:,1).ylabel] = deal("Current");
-[data.traces(:,2).ylabel] = deal("Voltage");
-[data.traces(:,1).yunit] = deal("pA");
-[data.traces(:,2).yunit] = deal("mV");
-data.groupids = [1; 1; 1; 2; 2];
-data.grouplabels = ["Group 1"; "Group 2"];
-updateUI_();
+
+% data.traces = repmat(template.trace, [5,2]);
+% for i_ = 1:size(data.traces,1)
+%     for j_ = 1:size(data.traces,2)
+%         data.traces(i_,j_).x = [0:99]';
+%         data.traces(i_,j_).y = rand(100,1) .* 10000;
+%     end
+% end
+% [data.traces(:,1).ylabel] = deal("Current");
+% [data.traces(:,2).ylabel] = deal("Voltage");
+% [data.traces(:,1).yunit] = deal("pA");
+% [data.traces(:,2).yunit] = deal("mV");
+% data.groupids = [1; 1; 1; 2; 2];
+% data.grouplabels = ["Group 1"; "Group 2"];
+% updateUI_();
 
 %% trace data interface
 % You should almost always use these functions to access trace (x,y) data
@@ -212,6 +213,11 @@ updateUI_();
     end
 
 %% per axes visible trace manipulations
+% These functions apply manipulations (e.g. offsets, scaling, masking,
+% ect.) to all visible traces in a given axes or list of axes. Most of
+% these manipulations require that data points within the traces be
+% selected using MATLAB's brush tool prior to applying the manipulation
+% (e.g. baseline requires a selected region to which to baseline).
 
     function autoscale_(ax, xy, same)
         if ~exist('ax', 'var') || isempty(ax)
@@ -1505,6 +1511,8 @@ end
     end
 
 %% sweep selection
+% Interface for traversing through sweeps.
+
     function ind = getSelectedSweeps_()
         ind = str2ind_(ui.selectedSweepsEdit.String);
         if isempty(ind)
@@ -1604,6 +1612,7 @@ end
     end
 
 %% group sweeps
+
     function mergeGroups_()
         data.groupids(:) = 1;
         updateUI_();
@@ -1688,6 +1697,7 @@ end
     end
 
 %% edit info
+
     function editInfo_()
         answer = inputdlg({'Date:', 'Patch/Cell ID:', 'Construct:', 'Experiment:'}, ...
             'Info', 1, ...
@@ -1818,123 +1828,131 @@ function UNUSED_traceXYTableCellEdited_(~, celldata)
 end
 
 %% i/o
+
     function clearData_()
         data = template.series;
     end
 
     function loadData_(filepath)
         if ~exist('filepath', 'var') || isempty(filepath)
-            [file, path] = uigetfile(fullfile(ui.path, '*.*'), 'Open data file.');
+            [file, path] = uigetfile(fullfile(ui.path, '*.mat'), 'Open data file.');
             if isequal(file, 0); return; end
             filepath = fullfile(path, file);
         end
         [ui.path, file, ext] = fileparts(filepath);
-        if ext ~= ".mat"; return; end
+        if ext ~= ".mat"
+            warndlg('Requires a *.mat file.', 'ERROR');
+            return
+        end
         wb = waitbar(0, 'Loading data file...');
         tmp = load(filepath);
         close(wb);
         file = strrep(file, '_', ' ');
-        if isfield(tmp, 'data') % assume PatchMeister .mat file
-            clearData_();
-            data.traces = repmat(template.trace, size(tmp.data.traces));
-            for i = 1:size(tmp.data.traces,1)
-                for j = 1:size(tmp.data.traces,2)
-                    data.traces(i,j).x = tmp.data.traces(i,j).x;
-                    data.traces(i,j).y = tmp.data.traces(i,j).y;
-                    data.traces(i,j).x0 = tmp.data.traces(i,j).x0;
-                    data.traces(i,j).y0 = tmp.data.traces(i,j).y0;
-                    data.traces(i,j).yscale = tmp.data.traces(i,j).yscale;
-                    data.traces(i,j).ismasked = tmp.data.traces(i,j).ismasked;
-                    if isfield(tmp.data.traces, 'masked')
-                        data.traces(i,j).masked = tmp.data.traces(i,j).masked;
-                    end
-                    if isfield(tmp.data.traces, 'zeroed')
-                        data.traces(i,j).zeroed = tmp.data.traces(i,j).zeroed;
-                    end
-                    if isfield(tmp.data.traces, 'interpolated')
-                        data.traces(i,j).interpolated = tmp.data.traces(i,j).interpolated;
-                    end
-                    if isfield(tmp.data.traces, 'xlabel')
-                        data.traces(i,j).xlabel = tmp.data.traces(i,j).xlabel;
-                    elseif isfield(tmp.data, 'xlabels')
-                        data.traces(i,j).xlabel = string(tmp.data.xlabels{1});
-                    end
-                    if isfield(tmp.data.traces, 'xunit')
-                        data.traces(i,j).xunit = tmp.data.traces(i,j).xunit;
-                    elseif isfield(tmp.data, 'xlabels')
-                        data.traces(i,j).xunit = string(tmp.data.xlabels{2});
-                    end
-                    if isfield(tmp.data.traces, 'ylabel')
-                        data.traces(i,j).ylabel = tmp.data.traces(i,j).ylabel;
-                    elseif isfield(tmp.data, 'ylabels')
-                        data.traces(i,j).ylabel = string(tmp.data.ylabels{j,1});
-                    end
-                    if isfield(tmp.data.traces, 'yunit')
-                        data.traces(i,j).yunit = tmp.data.traces(i,j).yunit;
-                    elseif isfield(tmp.data, 'ylabels')
-                        data.traces(i,j).yunit = string(tmp.data.ylabels{j,2});
-                    end
+        if ~isfield(tmp, 'data')
+            warndlg('Unknown data format.', 'ERROR');
+            return
+        end
+        clearData_();
+        % a lot of this has checks for legacy data structures
+        data.traces = repmat(template.trace, size(tmp.data.traces));
+        for i = 1:size(tmp.data.traces,1)
+            for j = 1:size(tmp.data.traces,2)
+                data.traces(i,j).x = tmp.data.traces(i,j).x;
+                data.traces(i,j).y = tmp.data.traces(i,j).y;
+                data.traces(i,j).x0 = tmp.data.traces(i,j).x0;
+                data.traces(i,j).y0 = tmp.data.traces(i,j).y0;
+                data.traces(i,j).yscale = tmp.data.traces(i,j).yscale;
+                data.traces(i,j).ismasked = tmp.data.traces(i,j).ismasked;
+                if isfield(tmp.data.traces, 'masked')
+                    data.traces(i,j).masked = tmp.data.traces(i,j).masked;
+                end
+                if isfield(tmp.data.traces, 'zeroed')
+                    data.traces(i,j).zeroed = tmp.data.traces(i,j).zeroed;
+                end
+                if isfield(tmp.data.traces, 'interpolated')
+                    data.traces(i,j).interpolated = tmp.data.traces(i,j).interpolated;
+                end
+                if isfield(tmp.data.traces, 'xlabel')
+                    data.traces(i,j).xlabel = tmp.data.traces(i,j).xlabel;
+                elseif isfield(tmp.data, 'xlabels')
+                    data.traces(i,j).xlabel = string(tmp.data.xlabels{1});
+                end
+                if isfield(tmp.data.traces, 'xunit')
+                    data.traces(i,j).xunit = tmp.data.traces(i,j).xunit;
+                elseif isfield(tmp.data, 'xlabels')
+                    data.traces(i,j).xunit = string(tmp.data.xlabels{2});
+                end
+                if isfield(tmp.data.traces, 'ylabel')
+                    data.traces(i,j).ylabel = tmp.data.traces(i,j).ylabel;
+                elseif isfield(tmp.data, 'ylabels')
+                    data.traces(i,j).ylabel = string(tmp.data.ylabels{j,1});
+                end
+                if isfield(tmp.data.traces, 'yunit')
+                    data.traces(i,j).yunit = tmp.data.traces(i,j).yunit;
+                elseif isfield(tmp.data, 'ylabels')
+                    data.traces(i,j).yunit = string(tmp.data.ylabels{j,2});
                 end
             end
-            if isfield(tmp.data, 'groupids')
-                data.groupids = tmp.data.groupids;
-            elseif isfield(tmp.data.traces, 'groupid')
-                data.groupids = vertcat(tmp.data.traces.groupid);
-            else
-                data.groupids = [1:size(data.traces,1)]';
-            end
-            if isfield(tmp.data, 'grouplabels')
-                data.grouplabels = string(tmp.data.grouplabels);
-            elseif isfield(tmp.data, 'groupnames')
-                data.grouplabels = string(tmp.data.groupnames);
-            else
-                data.grouplabels = repmat("", [0,0]);
-            end
-            if isfield(tmp.data, 'meta') && isfield(tmp.data.meta, 'date')
-                data.meta.date = tmp.data.meta.date;
-            elseif isfield(tmp.data, 'info') && isKey(tmp.data.info, 'date')
-                data.meta.date = tmp.data.info('date');
-            end
-            if isfield(tmp.data, 'meta') && isfield(tmp.data.meta, 'patchid')
-                data.meta.patchid = tmp.data.meta.patchid;
-            elseif isfield(tmp.data, 'info') && isKey(tmp.data.info, 'patchid')
-                data.meta.patchid = tmp.data.info('patchid');
-            end
-            if isfield(tmp.data, 'meta') && isfield(tmp.data.meta, 'construct')
-                data.meta.construct = tmp.data.meta.construct;
-            elseif isfield(tmp.data, 'info') && isKey(tmp.data.info, 'construct')
-                data.meta.construct = tmp.data.info('construct');
-            end
-            if isfield(tmp.data, 'meta') && isfield(tmp.data.meta, 'experiment')
-                data.meta.experiment = tmp.data.meta.experiment;
-            elseif isfield(tmp.data, 'info') && isKey(tmp.data.info, 'experiment')
-                data.meta.experiment = tmp.data.info('experiment');
-            end
-            if isfield(tmp.data, 'meta') && isfield(tmp.data.meta, 'notes')
-                data.meta.notes = tmp.data.meta.notes;
-            elseif isfield(tmp.data, 'info') && isKey(tmp.data.info, 'notes')
-                data.meta.notes = tmp.data.info('notes');
-            end
-        else % assume PatchMaster .mat file export
-            traceLabels = fieldnames(tmp);
-            ntraces = numel(traceLabels);
-            data.traces = repmat(template.trace, [ntraces,1]);
-            for i = 1:ntraces
-                xy = tmp.(traceLabels{i});
-                data.traces(i,1).x = xy(:,1);
-                data.traces(i,1).y = xy(:,2) .* 1e12; % A -> pA
-            end
-            data.xlabels = {'Time', 's'};
-            data.ylabels = {'Current', 'pA'};
-            data.groupids = [1:ntraces]';
-            data.grouplabels = {};
-            ind = strfind(file, ' ');
-            ind = [ind, repmat(length(file) + 1, [1, 3])];
-            data.meta.date = file(1:ind(1) - 1);
-            data.meta.patchid = file(ind(1) + 1:ind(2) - 1);
-            data.meta.construct = file(ind(2) + 1:ind(3) - 1);
-            data.meta.experiment = file(ind(3) + 1:end);
         end
+        if isfield(tmp.data, 'groupids')
+            data.groupids = tmp.data.groupids;
+        elseif isfield(tmp.data.traces, 'groupid')
+            data.groupids = vertcat(tmp.data.traces.groupid);
+        else
+            data.groupids = [1:size(data.traces,1)]';
+        end
+        if isfield(tmp.data, 'grouplabels')
+            data.grouplabels = string(tmp.data.grouplabels);
+        elseif isfield(tmp.data, 'groupnames')
+            data.grouplabels = string(tmp.data.groupnames);
+        else
+            data.grouplabels = repmat("", [0,0]);
+        end
+        if isfield(tmp.data, 'meta') && isfield(tmp.data.meta, 'date')
+            data.meta.date = tmp.data.meta.date;
+        elseif isfield(tmp.data, 'info') && isKey(tmp.data.info, 'date')
+            data.meta.date = tmp.data.info('date');
+        end
+        if isfield(tmp.data, 'meta') && isfield(tmp.data.meta, 'patchid')
+            data.meta.patchid = tmp.data.meta.patchid;
+        elseif isfield(tmp.data, 'info') && isKey(tmp.data.info, 'patchid')
+            data.meta.patchid = tmp.data.info('patchid');
+        end
+        if isfield(tmp.data, 'meta') && isfield(tmp.data.meta, 'construct')
+            data.meta.construct = tmp.data.meta.construct;
+        elseif isfield(tmp.data, 'info') && isKey(tmp.data.info, 'construct')
+            data.meta.construct = tmp.data.info('construct');
+        end
+        if isfield(tmp.data, 'meta') && isfield(tmp.data.meta, 'experiment')
+            data.meta.experiment = tmp.data.meta.experiment;
+        elseif isfield(tmp.data, 'info') && isKey(tmp.data.info, 'experiment')
+            data.meta.experiment = tmp.data.info('experiment');
+        end
+        if isfield(tmp.data, 'meta') && isfield(tmp.data.meta, 'notes')
+            data.meta.notes = tmp.data.meta.notes;
+        elseif isfield(tmp.data, 'info') && isKey(tmp.data.info, 'notes')
+            data.meta.notes = tmp.data.info('notes');
+        end
+%         else % assume PatchMaster .mat file export
+%             traceLabels = fieldnames(tmp);
+%             ntraces = numel(traceLabels);
+%             data.traces = repmat(template.trace, [ntraces,1]);
+%             for i = 1:ntraces
+%                 xy = tmp.(traceLabels{i});
+%                 data.traces(i,1).x = xy(:,1);
+%                 data.traces(i,1).y = xy(:,2) .* 1e12; % A -> pA
+%             end
+%             data.xlabels = {'Time', 's'};
+%             data.ylabels = {'Current', 'pA'};
+%             data.groupids = [1:ntraces]';
+%             data.grouplabels = {};
+%             ind = strfind(file, ' ');
+%             ind = [ind, repmat(length(file) + 1, [1, 3])];
+%             data.meta.date = file(1:ind(1) - 1);
+%             data.meta.patchid = file(ind(1) + 1:ind(2) - 1);
+%             data.meta.construct = file(ind(2) + 1:ind(3) - 1);
+%             data.meta.experiment = file(ind(3) + 1:end);
+%         end
         updateUI_();
         setSelectedSweeps_(1);
         autoscale_();
