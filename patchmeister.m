@@ -881,6 +881,7 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
         for i = 1:ngroups % group index
             ui.groups(i).panel = uipanel(ui.mainWindow, ...
                 'Units', 'pixels');
+            rows = getTracesInGroup_(i);
             for j = 1:nvischannels
                 channel = ui.visibleChannels.Value(j); % channel index
                 ui.groups(i).ax(j,1) = axes(ui.groups(i).panel, ...
@@ -895,10 +896,10 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
                 if i ~= ngroups || j ~= nvischannels
                     xlabel(ax, '');
                 else
-                    xlabel(ax, [char(data.traces(1,1).xlabel) ' (' char(data.traces(1,1).xunit) ')']);
+                    xlabel(ax, [char(data.traces(rows(1),1).xlabel) ' (' char(data.traces(rows(1),1).xunit) ')']);
                 end
                 ylabel(ax, {getGroupLabel_(i); ...
-                    [char(data.traces(channel,1).ylabel) ' (' char(data.traces(channel,1).yunit) ')']});
+                    [char(data.traces(rows(1),channel).ylabel) ' (' char(data.traces(rows(1),channel).yunit) ')']});
                 % axes context menu
                 ax.UserData.menu = createAxesMenu_(ax);
                 ax.UIContextMenu = ax.UserData.menu;
@@ -1485,7 +1486,7 @@ end
         end
     end
 
-    function traceind = getTracesInGroup(groupind)
+    function traceind = getTracesInGroup_(groupind)
         groupuids = unique(data.groupids);
         traceind = find(data.groupids == groupuids(groupind));
     end
