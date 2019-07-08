@@ -35,21 +35,21 @@ template.trace.timestamp = NaT;
 
 % Each column is a channel (e.g. current, voltage, etc.)
 % Each row is a sweep - a single data trace for each channel.
-data.traces = repmat(template.trace, [0,0]); % sweeps x channels
-data.xlabels = {}; % e.g. {'Time', 'ms'}
-data.ylabels = {}; % (channels x 2), e.g. {'Current', 'pA'; 'Voltage', 'mV'}
-
+template.data.traces = repmat(template.trace, [0,0]); % sweeps x channels
+template.data.xlabels = {}; % e.g. {'Time', 'ms'}
+template.data.ylabels = {}; % (channels x 2), e.g. {'Current', 'pA'; 'Voltage', 'mV'}
 % group sweeps
-data.groupids = []; % (sweeps x 1) group index for each sweep
-data.grouplabels = {}; % labels for each group
+template.data.groupids = []; % (sweeps x 1) group index for each sweep
+template.data.grouplabels = {}; % labels for each group
+% metadata
+template.data.meta.date = datestr(now, 'yyyy-mm-dd');
+template.data.meta.patchid = ''; % cell/patch ID
+template.data.meta.construct = ''; % construct, e.g. denote subunit composition and mutations
+template.data.meta.experiment = ''; % very short one-line summary of experiment (more detail can go in notes)
+template.data.meta.notes = '';
 
-% experiment info
-data.info = containers.Map;
-data.info('date') = datestr(now, 'yyyy-mm-dd');
-data.info('patchid') = ''; % cell/patch ID
-data.info('construct') = ''; % construct, e.g. denote subunit composition and mutations
-data.info('experiment') = ''; % very short one-line summary of experiment (more detail can go in notes)
-data.info('notes') = '';
+% data
+data = template.data;
 
 % UI
 ui = struct();
@@ -1445,10 +1445,10 @@ end
 
     function updateMainWindowTitle_()
         if ~isempty(data.traces)
-            ui.mainWindow.Name = [data.info('date') ...
-                '  [ ' data.info('patchid') ...
-                ' ]  [ ' data.info('construct') ...
-                ' ]  [ ' data.info('experiment') ' ]'];
+            ui.mainWindow.Name = [data.meta.date ...
+                '  [ ' data.meta.patchid ...
+                ' ]  [ ' data.meta.construct ...
+                ' ]  [ ' data.meta.experiment ' ]'];
         else
             ui.mainWindow.Name = 'Patch Meister';
         end
@@ -1690,12 +1690,12 @@ function tf = UNUSED_isSweepMaskedForAllGroups_(sweepind)
     function editInfo_()
         answer = inputdlg({'Date:', 'Patch/Cell ID:', 'Construct:', 'Experiment:'}, ...
             'Info', 1, ...
-            {data.info('date'), data.info('patchid'), data.info('construct'), data.info('experiment')});
+            {data.meta.date, data.meta.patchid, data.meta.construct, data.meta.experiment});
         if isempty(answer); return; end
-        data.info('date') = answer{1};
-        data.info('patchid') = answer{2};
-        data.info('construct') = answer{3};
-        data.info('experiment') = answer{4};
+        data.meta.date = answer{1};
+        data.meta.patchid = answer{2};
+        data.meta.construct = answer{3};
+        data.meta.experiment = answer{4};
         updateMainWindowTitle_();
     end
 
@@ -1710,7 +1710,7 @@ function tf = UNUSED_isSweepMaskedForAllGroups_(sweepind)
             'Style', 'edit', ...
             'Min', 0, ...
             'Max', 2, ...
-            'String', data.info('notes'), ...
+            'String', data.meta.notes, ...
             'Units', 'normalized', ...
             'Position', [0, 0, 1, 1], ...
             'HorizontalAlignment', 'left', ...
@@ -1719,7 +1719,7 @@ function tf = UNUSED_isSweepMaskedForAllGroups_(sweepind)
 
     function updateNotesFromUI_()
         if isfield(ui, 'notesEdit') && isvalid(ui.notesEdit)
-            data.info('notes') = ui.notesEdit.String;
+            data.meta.notes = ui.notesEdit.String;
         end
     end
 
@@ -1818,16 +1818,7 @@ end
 
 %% i/o
     function clearData_()
-        data.traces = repmat(template.trace, [0,0]);
-        data.xlabels = {};
-        data.ylabels = {};
-        data.groupids = [];
-        data.grouplabels = {};
-        data.info('date') = datestr(now, 'yyyy-mm-dd');
-        data.info('patchid') = '';
-        data.info('construct') = '';
-        data.info('experiment') = '';
-        data.info('notes') = '';
+        data = template.data;
     end
 
     function loadData_(filepath)
@@ -1843,10 +1834,7 @@ end
         close(wb);
         file = strrep(file, '_', ' ');
         if isfield(tmp, 'data') % assume PatchMeister .mat file
-            data.info = tmp.data.info;
-            if ~isKey(data.info, 'notes')
-                data.info('notes') = '';
-            end
+            clearData_();
             data.traces = repmat(template.trace, size(tmp.data.traces));
             for i = 1:size(tmp.data.traces,1)
                 for j = 1:size(tmp.data.traces,2)
@@ -1895,6 +1883,31 @@ end
             else
                 data.grouplabels = {};
             end
+            if isfield(tmp.data, 'meta') && isfield(tmp.data.meta, 'date')
+                data.meta.date = tmp.data.meta.date;
+            elseif isfield(tmp.data, 'info') && isKey(tmp.data.info, 'date')
+                data.meta.date = tmp.data.info('date');
+            end
+            if isfield(tmp.data, 'meta') && isfield(tmp.data.meta, 'patchid')
+                data.meta.patchid = tmp.data.meta.patchid;
+            elseif isfield(tmp.data, 'info') && isKey(tmp.data.info, 'patchid')
+                data.meta.patchid = tmp.data.info('patchid');
+            end
+            if isfield(tmp.data, 'meta') && isfield(tmp.data.meta, 'construct')
+                data.meta.construct = tmp.data.meta.construct;
+            elseif isfield(tmp.data, 'info') && isKey(tmp.data.info, 'construct')
+                data.meta.construct = tmp.data.info('construct');
+            end
+            if isfield(tmp.data, 'meta') && isfield(tmp.data.meta, 'experiment')
+                data.meta.experiment = tmp.data.meta.experiment;
+            elseif isfield(tmp.data, 'info') && isKey(tmp.data.info, 'experiment')
+                data.meta.experiment = tmp.data.info('experiment');
+            end
+            if isfield(tmp.data, 'meta') && isfield(tmp.data.meta, 'notes')
+                data.meta.notes = tmp.data.meta.notes;
+            elseif isfield(tmp.data, 'info') && isKey(tmp.data.info, 'notes')
+                data.meta.notes = tmp.data.info('notes');
+            end
         else % assume PatchMaster .mat file export
             traceLabels = fieldnames(tmp);
             ntraces = numel(traceLabels);
@@ -1910,10 +1923,10 @@ end
             data.grouplabels = {};
             ind = strfind(file, ' ');
             ind = [ind, repmat(length(file) + 1, [1, 3])];
-            data.info('date') = file(1:ind(1) - 1);
-            data.info('patchid') = file(ind(1) + 1:ind(2) - 1);
-            data.info('construct') = file(ind(2) + 1:ind(3) - 1);
-            data.info('experiment') = file(ind(3) + 1:end);
+            data.meta.date = file(1:ind(1) - 1);
+            data.meta.patchid = file(ind(1) + 1:ind(2) - 1);
+            data.meta.construct = file(ind(2) + 1:ind(3) - 1);
+            data.meta.experiment = file(ind(3) + 1:end);
         end
         updateUI_();
         setSelectedSweeps_(1);
@@ -2070,11 +2083,11 @@ end
             end
             data.groupids = ones([nrows,1], 'uint32');
             data.grouplabels = {};
-            data.info('date') = datestr(now, 'yyyy-mm-dd');
-            data.info('patchid') = '';
-            data.info('construct') = '';
-            data.info('experiment') = '';
-            data.info('notes') = '';
+            data.meta.date = datestr(now, 'yyyy-mm-dd');
+            data.meta.patchid = '';
+            data.meta.construct = '';
+            data.meta.experiment = '';
+            data.meta.notes = '';
         catch
             if ~isabfload
                 msgbox("!!! Requires package 'fcollman/abfload'. Find in MATLAB's Add-On Explorer.", ...
@@ -2364,10 +2377,10 @@ end
 
     function saveData_(filepath)
         if ~exist('filepath', 'var') || isempty(filepath)
-            default = fullfile(ui.path, [data.info('date') ...
-                ' ' data.info('patchid') ...
-                ' ' data.info('construct') ...
-                ' ' data.info('experiment') ...
+            default = fullfile(ui.path, [data.meta.date ...
+                ' ' data.meta.patchid ...
+                ' ' data.meta.construct ...
+                ' ' data.meta.experiment ...
                 '.mat']);
             [file, path] = uiputfile(default, 'Save data to file.');
             if isequal(file, 0); return; end
