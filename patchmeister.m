@@ -1965,93 +1965,77 @@ end
             filepath = fullfile(path, file);
         end
         [ui.path, file, ext] = fileparts(filepath);
+        % load HEKA data
         try
-            ishekaimporter = false;
             heka = HEKA_Importer(filepath);
-            ishekaimporter = true;
-            clearData_();
-            nrecordings = size(heka.RecTable,1);
-            % info for each recording are in the nonempty leaves of dataTree
-            recdata = heka.trees.dataTree(:,end);
-            clip = [];
-            for i = 1:numel(recdata)
-                if isempty(recdata{i}); clip = [clip i]; end
-            end
-            recdata(clip) = [];
-            if numel(recdata) ~= nrecordings
-                clearData_();
-                error('Unexpected data structure. Please report this error.');
-                return;
-            end
-            % use stimulus label to split into groups
-            for rec = 1:nrecordings
-                stimulus(rec) = string(heka.RecTable.Stimulus{rec});
-            end
-            ustimulus = unique(stimulus);
-            for i = 1:numel(ustimulus)
-                data.grouplabels{i} = char(ustimulus(i));
-            end
-            % trace data
-            for rec = 1:nrecordings
-                nchannels = numel(heka.RecTable.dataRaw{rec});
-                if ~isempty(data.traces) && size(data.traces,2) ~= nchannels
-                    clearData_();
-                    error('File contains recordings with different numbers of channels, which is not currently supported in Patch Meister.');
-                    return;
-                end
-                nsweeps = size(heka.RecTable.dataRaw{rec}{1},2);
-                npts = size(heka.RecTable.dataRaw{rec}{1},1);
-                traces = repmat(template.trace, [nsweeps,nchannels]);
-                for sweep = 1:nsweeps
-                    for channel = 1:nchannels
-                        if sweep == 1 && channel == 1
-                            traces(sweep,channel).x = [0:npts-1]' .* recdata{rec}.TrXInterval;
-                        else
-                            traces(sweep,channel).x = traces(1,1).x;
-                        end
-                        traces(sweep,channel).y = heka.RecTable.dataRaw{rec}{channel}(:,sweep);
-                        traces(sweep,channel).timestamp = heka.RecTable.TimeStamp{rec}(sweep);
-                    end
-                end
-                data.traces = [data.traces; traces];
-                data.groupids = [data.groupids; repmat(find(ustimulus == stimulus(rec)), [nsweeps,1])];
-                if rec == 1
-                    data.xlabels = {'Time', heka.RecTable.TimeUnit{rec}{1}};
-                    data.ylabels = {};
-                    for channel = 1:nchannels
-                        data.ylabels{channel,1} = heka.RecTable.ChName{rec}{channel};
-                        data.ylabels{channel,2} = heka.RecTable.ChUnit{rec}{channel};
-                    end
-                end
-                for channel = 1:nchannels
-                    if data.xlabels{2} ~= string(heka.RecTable.TimeUnit{rec}{channel})
-                        clearData_();
-                        error('Traces have different time units, which is not currently supported in Patch Meister.');
-                        return;
-                    end
-                    if data.ylabels{channel,1} ~= string(heka.RecTable.ChName{rec}{channel})
-                        clearData_();
-                        error('Traces have different channel labels, which is not currently supported in Patch Meister.');
-                        return;
-                    end
-                    if data.ylabels{channel,2} ~= string(heka.RecTable.ChUnit{rec}{channel})
-                        clearData_();
-                        error('Traces have different channel units, which is not supported in Patch Meister.');
-                        return;
-                    end
-                end
-            end % rec
-            %timestamps = vertcat(data.traces(:,1).timestamp)
-            %[~,ind] = sort(timestamps)
         catch
-            if ~ishekaimporter
-                msgbox("!!! Requires package 'HEKA Patchmaster Importer'. Find in MATLAB's Add-On Explorer.", ...
-                    'HEKA file loader');
-            else
-                msgbox("!!! Failed to load HEKA file. Please report error.", ...
-                    'HEKA file loader');
+            warndlg("!!! Requires package 'HEKA Patchmaster Importer'. Find in MATLAB's Add-On Explorer.", ...
+                'HEKA file loader');
+            return
+        end
+        nrecordings = size(heka.RecTable,1);
+        % info for each recording are in the nonempty leaves of dataTree
+        recdata = heka.trees.dataTree(:,end);
+        clip = [];
+        for i = 1:numel(recdata)
+            if isempty(recdata{i}); clip = [clip i]; end
+        end
+        recdata(clip) = [];
+        if numel(recdata) ~= nrecordings
+            warndlg('Unexpected data structure. Please report this error.');
+            return
+        end
+        if nrecordings > 1
+            % Ask which recordings to load. Loading multiple recordings is
+            % allowed provided they have the same channels.
+            stimuli = {};
+            for rec = 1:nrecordings
+                stimuli{rec} = heka.RecTable.Stimulus{rec};
             end
-            return;
+            selrec = listdlg('ListString', stimuli, ...
+                'PromptString', 'Select recordings to load:');
+        else
+            selrec = 1;
+        end
+        nchannels = numel(heka.RecTable.dataRaw{selrec(1)});
+        for i = 2:numel(selrec)
+            if nchannels ~= numel(heka.RecTable.dataRaw{selrec(i)}) ...
+                    || ~isequal(heka.RecTable.ChName{selrec(1)}, heka.RecTable.ChName{selrec(i)})
+                warndlg('Selected recordings do NOT have the same channels, and cannot be loaded together.');
+                return
+            end
+        end
+        clearData_();
+        groupid = 1;
+        for i = 1:numel(selrec)
+            rec = selrec(i);
+            if ~isempty(data.traces) && size(data.traces,2) ~= nchannels
+                clearData_();
+                warndlg('Selected recordings do NOT have the same channels, and cannot be loaded together.');
+                return
+            end
+            nsweeps = size(heka.RecTable.dataRaw{rec}{1},2);
+            npts = size(heka.RecTable.dataRaw{rec}{1},1);
+            traces = repmat(template.trace, [nsweeps,nchannels]);
+            for sweep = 1:nsweeps
+                for channel = 1:nchannels
+                    if sweep == 1 && channel == 1
+                        traces(sweep,channel).x = [0:npts-1]' .* recdata{rec}.TrXInterval;
+                    else
+                        traces(sweep,channel).x = traces(1,1).x;
+                    end
+                    traces(sweep,channel).y = heka.RecTable.dataRaw{rec}{channel}(:,sweep);
+                    traces(sweep,channel).xlabel = "Time";
+                    traces(sweep,channel).xunit = string(heka.RecTable.TimeUnit{rec}{channel});
+                    traces(sweep,channel).ylabel = string(heka.RecTable.ChName{rec}{channel}); 
+                    traces(sweep,channel).yunit = string(heka.RecTable.ChUnit{rec}{channel});
+                    traces(sweep,channel).timestamp = heka.RecTable.TimeStamp{rec}(sweep);
+                end
+            end
+            data.traces = [data.traces; traces];
+            data.groupids = [data.groupids; repmat(groupid, [nsweeps,1])];
+            data.grouplabels(groupid) = string(heka.RecTable.Stimulus{rec});
+            groupid = groupid + 1;
         end
         updateUI_();
         setSelectedSweeps_(1);
@@ -2066,63 +2050,58 @@ end
         end
         [ui.path, file, ext] = fileparts(filepath);
         try
-            isabfload = false;
             [d,si,h] = abfload(filepath); % data, sample interval (us), header
-            isabfload = true;
-            if iscell(d)
-                nrows = numel(d);
-                nchannels = size(d{1},2); % should be the same for all rows
-                data.traces = repmat(template.trace, [nrows,nchannels]);
-                for i = 1:nrows
-                    npts = size(d{i},1);
-                    for j = 1:nchannels
-                        if j == 1
-                            data.traces(i,j).x = [1:npts]' .* (si * 1e-3); % time (ms)
-                        else
-                            data.traces(i,j).x = data.traces(i,1).x;
-                        end
-                        data.traces(i,j).y = d{i}(:,j);
-                    end
-                end
-            else
-                nrows = size(d,3);
-                nchannels = size(d,2);
-                npts = size(d,1);
-                data.traces = repmat(template.trace, [nrows,nchannels]);
-                for i = 1:nrows
-                    for j = 1:nchannels
-                        if i == 1 && j == 1
-                            data.traces(i,j).x = [1:npts]' .* (si * 1e-3); % time (ms)
-                        else
-                            data.traces(i,j).x = data.traces(1,1).x;
-                        end
-                        data.traces(i,j).y = d(:,j,i);
-                    end
-                end
-            end
-            data.xlabels = {'Time', 'ms'};
-            data.ylabels = {};
-            for i = 1:nchannels
-                data.ylabels{i,1} = char(h.recChNames(i));
-                data.ylabels{i,2} = char(h.recChUnits(i));
-            end
-            data.groupids = ones([nrows,1], 'uint32');
-            data.grouplabels = {};
-            data.meta.date = datestr(now, 'yyyy-mm-dd');
-            data.meta.patchid = '';
-            data.meta.construct = '';
-            data.meta.experiment = '';
-            data.meta.notes = '';
         catch
-            if ~isabfload
-                msgbox("!!! Requires package 'fcollman/abfload'. Find in MATLAB's Add-On Explorer.", ...
-                    'pCLAMP ABF file loader');
-            else
-                msgbox("!!! Failed to load ABF file. Please report error.", ...
-                    'pCLAMP ABF file loader');
-            end
-            return;
+            warndlg("!!! Requires package 'fcollman/abfload'. Find in MATLAB's Add-On Explorer.", ...
+                'pCLAMP ABF file loader');
+            return
         end
+        if iscell(d)
+            nsweeps = numel(d);
+            nchannels = size(d{1},2); % should be the same for all rows
+            data.traces = repmat(template.trace, [nsweeps,nchannels]);
+            for sweep = 1:nsweeps
+                npts = size(d{sweep},1);
+                for channel = 1:nchannels
+                    if channel == 1
+                        data.traces(sweep,channel).x = [0:npts-1]' .* (si * 1e-6); % time (s)
+                    else
+                        data.traces(sweep,channel).x = data.traces(sweep,1).x;
+                    end
+                    data.traces(sweep,channel).y = d{sweep}(:,channel);
+                    data.traces(sweep,channel).xlabel = "Time";
+                    data.traces(sweep,channel).xunit = "s";
+                    data.traces(sweep,channel).ylabel = string(h.recChNames(channel));
+                    data.traces(sweep,channel).yunit = string(h.recChUnits(channel));
+                end
+            end
+        else
+            nsweeps = size(d,3);
+            nchannels = size(d,2);
+            npts = size(d,1);
+            data.traces = repmat(template.trace, [nsweeps,nchannels]);
+            for sweep = 1:nsweeps
+                for channel = 1:nchannels
+                    if sweep == 1 && channel == 1
+                        data.traces(sweep,channel).x = [0:npts-1]' .* (si * 1e-6); % time (s)
+                    else
+                        data.traces(sweep,channel).x = data.traces(1,1).x;
+                    end
+                    data.traces(sweep,channel).y = d(:,channel,sweep);
+                    data.traces(sweep,channel).xlabel = "Time";
+                    data.traces(sweep,channel).xunit = "s";
+                    data.traces(sweep,channel).ylabel = string(h.recChNames(channel));
+                    data.traces(sweep,channel).yunit = string(h.recChUnits(channel));
+                end
+            end
+        end
+        data.groupids = ones([nsweeps,1], 'uint32');
+        data.grouplabels = repmat("", [0,0]);
+        data.meta.date = '';
+        data.meta.patchid = '';
+        data.meta.construct = '';
+        data.meta.experiment = '';
+        data.meta.notes = '';
         updateUI_();
         setSelectedSweeps_(1);
         autoscale_();
