@@ -81,11 +81,24 @@ data.groupids = [1; 1; 1; 2; 2];
 data.grouplabels = ["Group 1"; "Group 2"];
 updateUI_();
 
-%% trace data
-    function [x,y] = getTrace_(trace)
-        % return the trace after applying offsets and scaling
-        x = trace.x - trace.x0;
-        y = (trace.y - trace.y0) .* trace.yscale;
+%% trace data interface
+% You should almost always use these functions to access trace (x,y) data
+% rather than directly referencing the trace.x and trace.y data fields.
+% This provides a consistent interface to the data (see description above).
+
+    function [x,y] = getXY_(trace, israw)
+        % the trace's original raw (x,y) data
+        x = trace.x;
+        y = trace.y;
+        if exist('israw', 'var') && israw
+            return;
+        end
+        % offset and scale (x,y) data
+        x = x - trace.x0;
+        y = (y - trace.y0) .* trace.yscale;
+        % interpolate segments
+        % first and last pts of each interpolated segment are unchanged,
+        % inbetween pts are linearly interpolated based on x values
         if any(trace.interpolated)
             pts = find(trace.interpolated);
             segments = breakIntoContiguousSegments_(pts);
@@ -98,73 +111,68 @@ updateUI_();
                 end
             end
         end
+        % zero segments
         if any(trace.zeroed)
             y(trace.zeroed) = 0;
         end
+        % set masked segments to NaN?
         if any(trace.masked) && ui.showMaskedBtn.Checked == "off"
             y(trace.masked) = nan;
         end
     end
 
-    function [x,y] = getAvgTrace_(traces, raw)
-        % return average trace only for x range in which all traces overlap
+    function [x,y] = getOverlappingXY_(traces, israw)
+        % return [x, y1, y2,...] for region where all traces overlap
+        % !!! traces should all have the same sample interval
         x = [];
         y = [];
         if isempty(traces); return; end
-        if exist('raw', 'var') && raw
-            x = traces(1).x;
-            y = traces(1).y;
-        else
-            [x,y] = getTrace_(traces(1));
-        end
-        n = ones(size(y));
-        n(isnan(y)) = 0;
+        if ~exist('israw', 'var'); israw = false; end
+        [x,y] = getXY_(traces(1), israw);
         dx = min(diff(x));
         epsilon = 0.01 * dx;
         for i = 2:numel(traces)
-            if exist('raw', 'var') && raw
-                xi = traces(i).x;
-                yi = traces(i).y;
-            else
-                [xi,yi] = getTrace_(traces(i));
-            end
+            [xi,yi] = getXY_(traces(i), israw);
             dxi = min(diff(xi));
-            if abs(dx - dxi) < epsilon
-                % assume sweeps have the same sample interval
-                ind = intersect(find(x >= xi(1) - epsilon), find(x <= xi(end) + epsilon));
-                indi = intersect(find(xi >= x(1) - epsilon), find(xi <= x(end) + epsilon));
-                if numel(ind) == numel(indi)
-                    x = x(ind);
-                    n = n(ind);
-                    y = y(ind);
-                    yi = yi(indi);
-                    ynan = isnan(y);
-                    yinan = isnan(yi);
-                    notnan = ~ynan & ~yinan;
-                    y(ynan) = yi(ynan);
-                    n(ynan) = 1;
-                    y(notnan) = y(notnan) + yi(notnan);
-                    n(notnan) = n(notnan) + 1;
-                    n(isnan(y)) = 0;
-                else
-                    disp('ERROR: Invalid overlapping indices for sweep average.');
-                end
-            else
-                disp('ERROR: Sweeps have different sample intervals.');
+            epsiloni = 0.01 * dxi;
+            ind = intersect(find(x >= xi(1) - epsilon), find(x <= xi(end) + epsilon));
+            indi = intersect(find(xi >= x(1) - epsiloni), find(xi <= x(end) + epsiloni));
+            if numel(ind) ~= numel(indi)
+                error('getOverlappingXY_: Invalid overlapping indices.');
+                x = [];
+                y = [];
+                return;
             end
+            x = x(ind);
+            y = y(ind,:);
+            xi = xi(indi);
+            yi = yi(indi);
+            if any(abs(x - xi) > epsilon)
+                error('getOverlappingXY_: Traces have different sample intervals.');
+                x = [];
+                y = [];
+                return;
+            end
+            y = [y yi];
         end
-        y = y ./ n;
     end
 
-    function segments = breakIntoContiguousSegments_(pts)
+    function [x,y] = getMeanXY_(traces, israw)
+        if ~exist('israw', 'var'); israw = false; end
+        [x,y] = getOverlappingXY_(traces, israw);
+        y = nanmean(y,2);
+    end
+
+    function segments = breakIntoContiguousSegments_(ind)
+        % return cell array of numeric arrays of contiguous indices
         segments = {};
-        segment = [pts(1)];
-        for i = 2:numel(pts)
-            if pts(i) == segment(end)+1
-                segment(end+1) = pts(i);
+        segment = [ind(1)];
+        for i = 2:numel(ind)
+            if ind(i) == segment(end)+1
+                segment(end+1) = ind(i);
             else
                 segments{end+1} = segment;
-                segment = [pts(i)];
+                segment = [ind(i)];
             end
         end
         if ~isempty(segment)
@@ -292,15 +300,14 @@ function UNUSED_shiftBaselineVisibleTraces_(ax, dy0)
         for i = 1:numel(ax)
             for j = 1:numel(ax(i).UserData.traces)
                 brushdata = logical(ax(i).UserData.traces(j).BrushData);
-                selpts = find(brushdata);
-                if ~isempty(selpts)
+                if any(brushdata)
                     row = ax(i).UserData.rows(j);
                     channel = ax(i).UserData.channel;
                     trace = data.traces(row,channel);
+                    [x,y] = getXY_(trace, ui.showRawBtn.Checked == "on");
                     if ui.showRawBtn.Checked == "on"
-                        data.traces(row,channel).y0 = mean(trace.y(brushdata));
+                        data.traces(row,channel).y0 = mean(y(brushdata));
                     else
-                        [x,y] = getTrace_(trace);
                         data.traces(row,channel).y0 = ...
                             trace.y0 + mean(y(brushdata));
                     end
@@ -324,8 +331,8 @@ function UNUSED_shiftBaselineVisibleTraces_(ax, dy0)
         for i = 1:numel(ax)
             for j = 1:numel(ax(i).UserData.traces)
                 brushdata = logical(ax(i).UserData.traces(j).BrushData);
-                selpts = find(brushdata);
-                if ~isempty(selpts)
+                if any(brushdata)
+                    selpts = find(brushdata);
                     dsel = find(diff(selpts) > 1);
                     if numel(dsel) == 1
                         selpts1 = selpts(1:dsel);
@@ -333,22 +340,15 @@ function UNUSED_shiftBaselineVisibleTraces_(ax, dy0)
                         row = ax(i).UserData.rows(j);
                         channel = ax(i).UserData.channel;
                         trace = data.traces(row,channel);
+                        [x,y] = getXY_(trace, ui.showRawBtn.Checked == "on");
+                        x1 = mean(x(selpts1));
+                        y1 = mean(y(selpts1));
+                        x2 = mean(x(selpts2));
+                        y2 = mean(y(selpts2));
+                        m = (y2 - y1) / (x2 - x1);
                         if ui.showRawBtn.Checked == "on"
-                            x1 = mean(trace.x(selpts1));
-                            y1 = mean(trace.y(selpts1));
-                            x2 = mean(trace.x(selpts2));
-                            y2 = mean(trace.y(selpts2));
-                            m = (y2 - y1) / (x2 - x1);
-                            npts = numel(trace.y);
                             data.traces(row,channel).y0 = m .* (trace.x - x1) + y1;
                         else
-                            [x,y] = getTrace_(trace);
-                            x1 = mean(x(selpts1));
-                            y1 = mean(y(selpts1));
-                            x2 = mean(x(selpts2));
-                            y2 = mean(y(selpts2));
-                            m = (y2 - y1) / (x2 - x1);
-                            npts = numel(y);
                             data.traces(row,channel).y0 = ...
                                 data.traces(row,channel).y0 + m .* (x - x1) + y1;
                         end
@@ -382,16 +382,18 @@ function UNUSED_shiftBaselineVisibleTraces_(ax, dy0)
         for i = 1:numel(ax)
             for j = 1:numel(ax(i).UserData.traces)
                 brushdata = logical(ax(i).UserData.traces(j).BrushData);
-                selpts = find(brushdata);
-                if ~isempty(selpts)
+                if any(brushdata)
+                    selpts = find(brushdata);
                     row = ax(i).UserData.rows(j);
                     channel = ax(i).UserData.channel;
                     trace = data.traces(row,channel);
-                    %[x,y] = getTrace_(trace);
-                    npts = numel(trace.y);
+                    % !!! ALWAYS apply spline fit to the raw data
+                    % This allows repeated spline trial fits without
+                    % accruing distortions from bogus fits
+                    [x,y] = getXY_(trace, true);
                     try
-                        pp = splinefit(trace.x(selpts), trace.y(selpts), nsegments);
-                        data.traces(row,channel).y0 = ppval(pp, trace.x);
+                        pp = splinefit(x(selpts), y(selpts), nsegments);
+                        data.traces(row,channel).y0 = ppval(pp, x);
                     catch
                         msgbox("!!! Requires package 'splinefit'. See Add-On Explorer.", ...
                             'Baseline Spline');
@@ -439,15 +441,15 @@ function UNUSED_shiftBaselineVisibleTraces_(ax, dy0)
             'Units', 'normalized', ...
             'Position', [0, 0, 1, 0.33], ...
             'Callback', @(s,e) baselineSplineVisibleTraces_(ax));
-        if ui.showRawBtn.Checked == "off"
-            ui.showRawBtn.Checked = 'on';
-            ui.showBaselineBtn.Checked = 'on';
-            refresh_();
-            autoscale_();
-        elseif ui.showBaselineBtn.Checked == "off"
-            ui.showBaselineBtn.Checked = 'on';
-            redraw_();
-        end
+%         if ui.showRawBtn.Checked == "off"
+%             ui.showRawBtn.Checked = 'on';
+%             ui.showBaselineBtn.Checked = 'on';
+%             refresh_();
+%             autoscale_();
+%         elseif ui.showBaselineBtn.Checked == "off"
+%             ui.showBaselineBtn.Checked = 'on';
+%             redraw_();
+%         end
     end
 
     function setScaleVisibleTraces_(ax, yscale)
@@ -500,16 +502,15 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
         for i = 1:numel(ax)
             for j = 1:numel(ax(i).UserData.traces)
                 brushdata = logical(ax(i).UserData.traces(j).BrushData);
-                selpts = find(brushdata);
-                if ~isempty(selpts)
+                if any(brushdata)
                     row = ax(i).UserData.rows(j);
                     channel = ax(i).UserData.channel;
                     trace = data.traces(row,channel);
+                    [x,y] = getXY_(trace, ui.showRawBtn.Checked == "on");
                     if ui.showRawBtn.Checked == "on"
-                        data.traces(row,channel).yscale = 1.0 / max(trace.y(selpts));
+                        data.traces(row,channel).yscale = 1.0 / max(y(brushdata));
                     else
-                        [x,y] = getTrace_(trace);
-                        data.traces(row,channel).yscale = trace.yscale ./ max(y(selpts));
+                        data.traces(row,channel).yscale = trace.yscale ./ max(y(brushdata));
                     end
                     didit = true;
                 end
@@ -531,16 +532,15 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
         for i = 1:numel(ax)
             for j = 1:numel(ax(i).UserData.traces)
                 brushdata = logical(ax(i).UserData.traces(j).BrushData);
-                selpts = find(brushdata);
-                if ~isempty(selpts)
+                if any(brushdata)
                     row = ax(i).UserData.rows(j);
                     channel = ax(i).UserData.channel;
                     trace = data.traces(row,channel);
+                    [x,y] = getXY_(trace, ui.showRawBtn.Checked == "on");
                     if ui.showRawBtn.Checked == "on"
-                        data.traces(row,channel).yscale = 1.0 / abs(min(trace.y(selpts)));
+                        data.traces(row,channel).yscale = 1.0 / abs(min(y(brushdata)));
                     else
-                        [x,y] = getTrace_(trace);
-                        data.traces(row,channel).yscale = trace.yscale ./ abs(min(y(selpts)));
+                        data.traces(row,channel).yscale = trace.yscale ./ abs(min(y(brushdata)));
                     end
                     didit = true;
                 end
@@ -562,16 +562,15 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
         for i = 1:numel(ax)
             for j = 1:numel(ax(i).UserData.traces)
                 brushdata = logical(ax(i).UserData.traces(j).BrushData);
-                selpts = find(brushdata);
-                if ~isempty(selpts)
+                if any(brushdata)
                     row = ax(i).UserData.rows(j);
                     channel = ax(i).UserData.channel;
                     trace = data.traces(row,channel);
+                    [x,y] = getXY_(trace, ui.showRawBtn.Checked == "on");
                     if ui.showRawBtn.Checked == "on"
-                        data.traces(row,channel).yscale = 1.0 / max(abs(trace.y(selpts)));
+                        data.traces(row,channel).yscale = 1.0 / max(abs(y(brushdata)));
                     else
-                        [x,y] = getTrace_(trace);
-                        data.traces(row,channel).yscale = trace.yscale ./ max(abs(y(selpts)));
+                        data.traces(row,channel).yscale = trace.yscale ./ max(abs(y(brushdata)));
                     end
                     didit = true;
                 end
@@ -628,19 +627,14 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
         for i = 1:numel(ax)
             for j = 1:numel(ax(i).UserData.traces)
                 brushdata = logical(ax(i).UserData.traces(j).BrushData);
-                selpts = find(brushdata);
-                if ~isempty(selpts)
+                if any(brushdata)
+                    selpts = find(brushdata);
                     row = ax(i).UserData.rows(j);
                     channel = ax(i).UserData.channel;
                     trace = data.traces(row,channel);
-                    if ui.showRawBtn.Checked == "on"
-                        x = trace.x;
-                        y = trace.y;
-                    else
-                        [x,y] = getTrace_(trace);
-                    end
-                    y = y - mean(y(selpts));
-                    threshold = xSD * std(y(selpts));
+                    [x,y] = getXY_(trace, ui.showRawBtn.Checked == "on");
+                    y = y - mean(y(brushdata));
+                    threshold = xSD * std(y(brushdata));
                     if direction == "Absolute Value"
                         ind = find(abs(y(selpts(end)+1:end)) > threshold, 1);
                     elseif direction == "Positive"
@@ -648,7 +642,12 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
                     elseif direction == "Negative"
                         ind = find(y(selpts(end)+1:end) < -threshold, 1);
                     end
-                    data.traces(row,channel).x0 = trace.x(selpts(end) + ind);
+                    if ui.showRawBtn.Checked == "on"
+                        data.traces(row,channel).x0 = x(selpts(end) + ind);
+                    else
+                        data.traces(row,channel).x0 = ...
+                            data.traces(row,channel).x0 + x(selpts(end) + ind);
+                    end
                     didit = true;
                 end
             end
@@ -656,8 +655,8 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
         if didit
             redraw_();
         else
-            msgbox('Select data to normalize to with the brush tool.', ...
-                'Normalize Abs Peak');
+            msgbox('Select baseline data just prior to peak onset with the brush tool.', ...
+                'Align To Onset');
         end
     end
 
@@ -669,8 +668,7 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
         for i = 1:numel(ax)
             for j = 1:numel(ax(i).UserData.traces)
                 brushdata = logical(ax(i).UserData.traces(j).BrushData);
-                selpts = find(brushdata);
-                if ~isempty(selpts)
+                if any(brushdata)
                     row = ax(i).UserData.rows(j);
                     channel = ax(i).UserData.channel;
                     if isempty(data.traces(row,channel).masked)
@@ -699,8 +697,7 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
         for i = 1:numel(ax)
             for j = 1:numel(ax(i).UserData.traces)
                 brushdata = logical(ax(i).UserData.traces(j).BrushData);
-                selpts = find(brushdata);
-                if ~isempty(selpts)
+                if any(brushdata)
                     row = ax(i).UserData.rows(j);
                     channel = ax(i).UserData.channel;
                     if isempty(data.traces(row,channel).zeroed)
@@ -729,8 +726,7 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
         for i = 1:numel(ax)
             for j = 1:numel(ax(i).UserData.traces)
                 brushdata = logical(ax(i).UserData.traces(j).BrushData);
-                selpts = find(brushdata);
-                if ~isempty(selpts)
+                if any(brushdata)
                     row = ax(i).UserData.rows(j);
                     channel = ax(i).UserData.channel;
                     if isempty(data.traces(row,channel).interpolated)
@@ -863,7 +859,7 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
     function updateUI_()
         ngroups = getNumGroups_();
         nchannels = getNumChannels_();
-        % update visible channels
+        % update visible channels from ui list
         ui.visibleChannels.String = cellstr(horzcat(data.traces(1,:).ylabel));
         ui.visibleChannels.Min = 0;
         ui.visibleChannels.Max = nchannels;
@@ -1009,42 +1005,42 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
                             if ui.showAverageOnlyBtn.Checked == "off" % show traces
                                 for k = 1:nrows
                                     trace = data.traces(rows(k),channel);
+                                    [x,y] = getXY_(trace, ui.showRawBtn.Checked == "on");
                                     if ~trace.ismasked % not masked
                                         ax.UserData.traces = [ax.UserData.traces; ...
-                                            plot(ax, trace.x, trace.y, 'color', cmap(1+mod(k-1,ncolors),:))];
+                                            plot(ax, x, y, 'color', cmap(1+mod(k-1,ncolors),:))];
                                         ax.UserData.rows = [ax.UserData.rows; rows(k)];
                                     elseif ui.showMaskedBtn.Checked == "on" % show masked traces
                                         ax.UserData.traces = [ax.UserData.traces; ...
-                                            plot(ax, trace.x, trace.y, 'color', [0.5, 0.5, 0.5])];
+                                            plot(ax, x, y, 'color', [0.5, 0.5, 0.5])];
                                         ax.UserData.rows = [ax.UserData.rows; rows(k)];
                                     end
                                     if ui.showBaselineBtn.Checked == "on" ... % show baseline
                                             && (~trace.ismasked || ui.showMaskedBtn.Checked == "on")
                                         y0 = trace.y0;
                                         if numel(y0) == 1
-                                            y0 = repmat(y0, size(trace.y));
+                                            y0 = repmat(y0, size(y));
                                         end
                                         ax.UserData.baselines = [ax.UserData.baselines; ...
-                                            plot(ax, trace.x, y0, 'k--')];
+                                            plot(ax, x, y0, 'k--')];
                                     end
                                 end
                             end
                             if ui.showAverageBtn.Checked == "on" ...
                                     || ui.showAverageOnlyBtn.Checked == "on" % show average
-                                [x, y] = getAvgTrace_(data.traces(rows, channel), true);
+                                [x,y] = getMeanXY_(data.traces(rows,channel), ui.showRawBtn.Checked == "on");
                                 ax.UserData.avgtrace = plot(ax, x, y, 'k-');
                             end
                         else % show offset and scaled data
                             if ui.showAverageOnlyBtn.Checked == "off" % show traces
                                 for k = 1:nrows
                                     trace = data.traces(rows(k),channel);
+                                    [x,y] = getXY_(trace, ui.showRawBtn.Checked == "on");
                                     if ~trace.ismasked
-                                        [x, y] = getTrace_(trace);
                                         ax.UserData.traces = [ax.UserData.traces; ...
                                             plot(ax, x, y, 'color', cmap(1+mod(k-1,ncolors),:))];
                                         ax.UserData.rows = [ax.UserData.rows; rows(k)];
                                     elseif ui.showMaskedBtn.Checked == "on" % show masked traces
-                                        [x, y] = getTrace_(trace);
                                         ax.UserData.traces = [ax.UserData.traces; ...
                                             plot(ax, x, y, 'color', [0.5, 0.5, 0.5])];
                                         ax.UserData.rows = [ax.UserData.rows; rows(k)];
@@ -1053,7 +1049,7 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
                             end
                             if ui.showAverageBtn.Checked == "on" ...
                                     || ui.showAverageOnlyBtn.Checked == "on" % show average
-                                [x, y] = getAvgTrace_(data.traces(rows,channel));
+                                [x,y] = getMeanXY_(data.traces(rows,channel), ui.showRawBtn.Checked == "on");
                                 ax.UserData.avgtrace = plot(ax, x, y, 'k-');
                             end
                             if ui.showBaselineBtn.Checked == "on" % show baseline
@@ -1064,36 +1060,22 @@ function UNUSED_scaleVisibleTraces_(ax, yscale)
                 else % refresh
                     for k = 1:numel(ax.UserData.traces)
                         trace = data.traces(ax.UserData.rows(k),channel);
-                        if ui.showRawBtn.Checked == "on" % show raw data
-                            ax.UserData.traces(k).XData(:) = trace.x;
-                            ax.UserData.traces(k).YData(:) = trace.y;
-                        else % show offset and scaled data
-                            [x, y] = getTrace_(trace);
-                            ax.UserData.traces(k).XData(:) = x;
-                            ax.UserData.traces(k).YData(:) = y;
-                        end
-                    end
-                    for k = 1:numel(ax.UserData.baselines)
-                        trace = data.traces(ax.UserData.rows(k),channel);
-                        if ui.showRawBtn.Checked == "on" % show raw data
+                        [x,y] = getXY_(trace, ui.showRawBtn.Checked == "on");
+                        ax.UserData.traces(k).XData(:) = x;
+                        ax.UserData.traces(k).YData(:) = y;
+                        if numel(ax.UserData.baselines) >= k && ui.showRawBtn.Checked == "on"
                             y0 = trace.y0;
                             if numel(y0) == 1
-                                y0 = repmat(y0, size(trace.y));
+                                y0 = repmat(y0, size(y));
                             end
-                            ax.UserData.baselines(k).XData(:) = trace.x;
+                            ax.UserData.baselines(k).XData(:) = x;
                             ax.UserData.baselines(k).YData(:) = y0;
                         end
                     end
                     if ~isempty(ax.UserData.avgtrace)
-                        if ui.showRawBtn.Checked == "on" % show raw data
-                            [x, y] = getAvgTrace_(data.traces(ax.UserData.rows,channel), true);
-                            ax.UserData.avgtrace.XData(:) = x;
-                            ax.UserData.avgtrace.YData(:) = y;
-                        else % show offset and scaled data
-                            [x, y] = getAvgTrace_(data.sweeps(ax.UserData.rows,channel));
-                            ax.UserData.avgtrace.XData(:) = x;
-                            ax.UserData.avgtrace.YData(:) = y;
-                        end
+                        [x,y] = getMeanXY_(data.traces(ax.UserData.rows,channel), ui.showRawBtn.Checked == "on");
+                        ax.UserData.avgtrace.XData(:) = x;
+                        ax.UserData.avgtrace.YData(:) = y;
                     end
                 end
             end
