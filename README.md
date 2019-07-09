@@ -16,14 +16,15 @@ Most everything is in patchmeister.m
 * Baseline spline fitting requires the [splinefit](https://www.mathworks.com/matlabcentral/fileexchange/71225-splinefit) package by Jonas Lundgren. Easiest option is to install it via MATLAB's Add-On Explorer.
 * Importing HEKA data files requires the [HEKA Patchmaster Importer](https://github.com/ChristianKeine/HEKA_Patchmaster_Importer) package by Christian Keine. Easiest option is to install it via MATLAB's Add-On Explorer.
 * Importing Axon ABF(2) data files requires the [fcollman/abfload](https://github.com/fcollman/abfload) package by Forrest Collman. Easiest option is to install it via MATLAB's Add-On Explorer (search for fcollman/abfload).
+* Importing Axograph(X) data files requires `readAxograph.m` from this repository.
 
 Tested with MATLAB R2019a.
 
 ### Capabilites
 * *Import data.*
-    * HEKA PatchMaster datafile (*NOT tested for multiple channels, otherwise working*)
-    * Molecular Devices pCLAMP datafile (*NOT tested*)
-    * :construction: AxoGraph or AxographX datafile
+    * HEKA PatchMaster data file (*NOT tested for multiple channels, otherwise working*)
+    * Molecular Devices pCLAMP data file (*NOT tested*)
+    * :construction: AxoGraph or AxographX data file
 * *Organize a series of current/voltage/etc vs. time sweeps by splitting them into groups.*
     * View one or more selected channels (e.g. current, voltage, etc.)
     * Group interleaved sweeps for each channel.
