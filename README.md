@@ -48,3 +48,4 @@ Tested with MATLAB R2019a.
     * **Align to Onset** - Set time zero (X offset) to first data point following selected data points that is some number of standard deviations of the selected data points away (absolute value, positive or negative) from the mean of the selected data points. Note that this may shift traces such that the data points at the beginning or end of the trace no longer align in time with data points at the beginning or end of other traces. The group average will automatically handle these offsets by trimming each trace in the group to the set of overlapping points prior to averaging.
     * **Manually specify X and Y offsets and Y scale factor** - Set time zero (X offset), baseline (Y offset) and Y scale.
     * **Mask/Zero/Interpolate** - Mask, zero or interpolate selected segments of data points.
+    * **Decimate** - Decimate displayed traces. Does NOT alter actual data.
