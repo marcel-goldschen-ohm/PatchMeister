@@ -2114,7 +2114,7 @@ end
         try
             heka = HEKA_Importer(filepath);
         catch
-            warndlg("!!! Requires package 'HEKA Patchmaster Importer'. Find in MATLAB's Add-On Explorer.", ...
+            warndlg("!!! Requires package 'HEKA Patchmaster Importer' by Christian Keine. Find in MATLAB's Add-On Explorer.", ...
                 'HEKA file loader');
             return
         end
@@ -2197,7 +2197,7 @@ end
         try
             [d,si,h] = abfload(filepath); % data, sample interval (us), header
         catch
-            warndlg("!!! Requires package 'fcollman/abfload'. Find in MATLAB's Add-On Explorer.", ...
+            warndlg("!!! Requires package 'fcollman/abfload' by Forrest Collman. Find in MATLAB's Add-On Explorer.", ...
                 'pCLAMP ABF file loader');
             return
         end
