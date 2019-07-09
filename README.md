@@ -19,7 +19,7 @@ Tested with MATLAB R2019a.
 
 ### Capabilites
 * *Import data.*
-    * HEKA PatchMaster datafile
+    * HEKA PatchMaster datafile (*NOT tested for multiple channels, otherwise working*)
     * Molecular Devices pCLAMP datafile (*NOT tested*)
     * :construction: AxoGraph or AxographX datafile
 * *Organize a series of current/voltage/etc vs. time sweeps by splitting them into groups.*
