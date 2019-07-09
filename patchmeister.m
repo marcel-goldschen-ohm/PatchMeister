@@ -148,7 +148,7 @@ initUI_();
             y(trace.zeroed) = 0;
         end
         % set masked segments to NaN?
-        if any(trace.masked) && ui.showMaskedBtn.Checked == "off"
+        if any(trace.masked) && ~showMasked_()
             y(trace.masked) = nan;
         end
     end
@@ -319,10 +319,11 @@ initUI_();
             if isempty(answer); return; end
             y0 = str2num(answer{1});
         end
+        israw = showRaw_();
         for i = 1:numel(ax)
             rows = ax(i).UserData.rows;
             channel = ax(i).UserData.channel;
-            if ui.showRawBtn.Checked == "on"
+            if israw
                 % set baseline
                 [data.traces(rows,channel).y0] = deal(y0);
             else
@@ -340,6 +341,7 @@ initUI_();
         if ~exist('ax', 'var') || isempty(ax)
             ax = vertcat(ui.groups.ax);
         end
+        israw = showRaw_();
         didit = false;
         for i = 1:numel(ax)
             for j = 1:numel(ax(i).UserData.traces)
@@ -348,8 +350,8 @@ initUI_();
                     row = ax(i).UserData.rows(j);
                     channel = ax(i).UserData.channel;
                     trace = data.traces(row,channel);
-                    [x,y] = getXY_(trace, ui.showRawBtn.Checked == "on");
-                    if ui.showRawBtn.Checked == "on"
+                    [x,y] = getXY_(trace, israw);
+                    if israw
                         data.traces(row,channel).y0 = mean(y(brushdata));
                     else
                         data.traces(row,channel).y0 = ...
@@ -371,6 +373,7 @@ initUI_();
         if ~exist('ax', 'var') || isempty(ax)
             ax = vertcat(ui.groups.ax);
         end
+        israw = showRaw_();
         didit = false;
         for i = 1:numel(ax)
             for j = 1:numel(ax(i).UserData.traces)
@@ -384,13 +387,13 @@ initUI_();
                         row = ax(i).UserData.rows(j);
                         channel = ax(i).UserData.channel;
                         trace = data.traces(row,channel);
-                        [x,y] = getXY_(trace, ui.showRawBtn.Checked == "on");
+                        [x,y] = getXY_(trace, israw);
                         x1 = mean(x(selpts1));
                         y1 = mean(y(selpts1));
                         x2 = mean(x(selpts2));
                         y2 = mean(y(selpts2));
                         m = (y2 - y1) / (x2 - x1);
-                        if ui.showRawBtn.Checked == "on"
+                        if israw
                             data.traces(row,channel).y0 = m .* (trace.x - x1) + y1;
                         else
                             data.traces(row,channel).y0 = ...
@@ -505,10 +508,11 @@ initUI_();
             if isempty(answer); return; end
             yscale = str2num(answer{1});
         end
+        israw = showRaw_();
         for i = 1:numel(ax)
             rows = ax(i).UserData.rows;
             channel = ax(i).UserData.channel;
-            if ui.showRawBtn.Checked == "on"
+            if israw
                 % set scale
                 [data.traces(rows,channel).yscale] = deal(yscale);
             else
@@ -526,6 +530,7 @@ initUI_();
         if ~exist('ax', 'var') || isempty(ax)
             ax = vertcat(ui.groups.ax);
         end
+        israw = showRaw_();
         didit = false;
         for i = 1:numel(ax)
             for j = 1:numel(ax(i).UserData.traces)
@@ -534,8 +539,8 @@ initUI_();
                     row = ax(i).UserData.rows(j);
                     channel = ax(i).UserData.channel;
                     trace = data.traces(row,channel);
-                    [x,y] = getXY_(trace, ui.showRawBtn.Checked == "on");
-                    if ui.showRawBtn.Checked == "on"
+                    [x,y] = getXY_(trace, israw);
+                    if israw
                         data.traces(row,channel).yscale = 1.0 / max(y(brushdata));
                     else
                         data.traces(row,channel).yscale = trace.yscale ./ max(y(brushdata));
@@ -556,6 +561,7 @@ initUI_();
         if ~exist('ax', 'var') || isempty(ax)
             ax = vertcat(ui.groups.ax);
         end
+        israw = showRaw_();
         didit = false;
         for i = 1:numel(ax)
             for j = 1:numel(ax(i).UserData.traces)
@@ -564,8 +570,8 @@ initUI_();
                     row = ax(i).UserData.rows(j);
                     channel = ax(i).UserData.channel;
                     trace = data.traces(row,channel);
-                    [x,y] = getXY_(trace, ui.showRawBtn.Checked == "on");
-                    if ui.showRawBtn.Checked == "on"
+                    [x,y] = getXY_(trace, israw);
+                    if israw
                         data.traces(row,channel).yscale = 1.0 / abs(min(y(brushdata)));
                     else
                         data.traces(row,channel).yscale = trace.yscale ./ abs(min(y(brushdata)));
@@ -586,6 +592,7 @@ initUI_();
         if ~exist('ax', 'var') || isempty(ax)
             ax = vertcat(ui.groups.ax);
         end
+        israw = showRaw_();
         didit = false;
         for i = 1:numel(ax)
             for j = 1:numel(ax(i).UserData.traces)
@@ -594,8 +601,8 @@ initUI_();
                     row = ax(i).UserData.rows(j);
                     channel = ax(i).UserData.channel;
                     trace = data.traces(row,channel);
-                    [x,y] = getXY_(trace, ui.showRawBtn.Checked == "on");
-                    if ui.showRawBtn.Checked == "on"
+                    [x,y] = getXY_(trace, israw);
+                    if israw
                         data.traces(row,channel).yscale = 1.0 / max(abs(y(brushdata)));
                     else
                         data.traces(row,channel).yscale = trace.yscale ./ max(abs(y(brushdata)));
@@ -621,10 +628,11 @@ initUI_();
             if isempty(answer); return; end
             x0 = str2num(answer{1});
         end
+        israw = showRaw_();
         for i = 1:numel(ax)
             rows = ax(i).UserData.rows;
             channel = ax(i).UserData.channel;
-            if ui.showRawBtn.Checked == "on"
+            if israw
                 % set time zero
                 [data.traces(rows,channel).x0] = deal(x0);
             else
@@ -653,6 +661,7 @@ initUI_();
             if isempty(ind); return; end
             direction = choices{ind};
         end
+        israw = showRaw_();
         didit = false;
         for i = 1:numel(ax)
             for j = 1:numel(ax(i).UserData.traces)
@@ -662,7 +671,7 @@ initUI_();
                     row = ax(i).UserData.rows(j);
                     channel = ax(i).UserData.channel;
                     trace = data.traces(row,channel);
-                    [x,y] = getXY_(trace, ui.showRawBtn.Checked == "on");
+                    [x,y] = getXY_(trace, israw);
                     y = y - mean(y(brushdata));
                     threshold = xSD * std(y(brushdata));
                     if direction == "Absolute Value"
@@ -672,7 +681,7 @@ initUI_();
                     elseif direction == "Negative"
                         ind = find(y(selpts(end)+1:end) < -threshold, 1);
                     end
-                    if ui.showRawBtn.Checked == "on"
+                    if israw
                         data.traces(row,channel).x0 = x(selpts(end) + ind);
                     else
                         data.traces(row,channel).x0 = ...
@@ -772,7 +781,7 @@ initUI_();
         if didit
             redraw_();
         else
-            msgbox('Select data to mask with the brush tool.', ...
+            msgbox('Select data to interpolate with the brush tool.', ...
                 'Interpolate Selected Region');
         end
     end
@@ -781,12 +790,21 @@ initUI_();
         if ~exist('ax', 'var') || isempty(ax)
             ax = vertcat(ui.groups.ax);
         end
+        didit = false;
         for i = 1:numel(ax)
             rows = ax(i).UserData.rows;
             channel = ax(i).UserData.channel;
-            [data.traces(rows,channel).ismasked] = deal(ismasked);
+            if ~isempty(rows)
+                [data.traces(rows,channel).ismasked] = deal(ismasked);
+                didit = true;
+            end
         end
-        refresh_();
+        if didit
+            refresh_();
+        else
+            msgbox('No visible traces. To unmask, first show masked traces.', ...
+                'Mask/UnMask');
+        end
     end
 
     function revertToRawVisibleTraces_(ax)
@@ -835,33 +853,53 @@ initUI_();
             'Position', [0 0 1 1], ...
             'numbertitle', 'off');
         ui.mainWindow.Units = 'pixels';
-        
-        ui.visibleChannels = uicontrol(ui.mainWindow, ...
-            'Style', 'listbox', ...
-            'Value', [], ...
-            'Callback', @(s,e) updateUI_());
 
         loadIcons_();
         
         ui.menu = createMainMenu_();
         
+        % visible channels
+        ui.channelspanel = uipanel(ui.mainWindow, ...
+            'Units', 'pixels', ...
+            'Position', [0, 0, 100, 60]);
+        uicontrol(ui.channelspanel, ...
+            'Style', 'text', ...
+            'String', 'Channels', ...
+            'HorizontalAlignment', 'left', ...
+            'ForegroundColor', [0 0 1], ...
+            'Units', 'pixels', ...
+            'Position', [0, 45, 100, 15]);
+        ui.visibleChannels = uicontrol(ui.channelspanel, ...
+            'Style', 'listbox', ...
+            'Value', [], ...
+            'Units', 'pixels', ...
+            'Position', [0, 0, 100, 45], ...
+            'Callback', @(s,e) updateUI_());
+        
         % sweep traversal
         ui.sweepspanel = uipanel(ui.mainWindow, ...
             'Units', 'pixels', ...
             'Position', [0, 0, 100, 70]);
+        uicontrol(ui.sweepspanel, ...
+            'Style', 'text', ...
+            'String', 'Sweeps', ...
+            'HorizontalAlignment', 'left', ...
+            'ForegroundColor', [0 0 1], ...
+            'Units', 'pixels', ...
+            'Position', [0, 55, 100, 15]);
         ui.prevSweepBtn = uicontrol(ui.sweepspanel, ...
             'Style', 'pushbutton', ...
             'Tooltip', 'Previous Sweep', ...
             'String', '<', ...
             'Units', 'pixels', ...
-            'Position', [0, 20, 50, 50], ...
+            'Position', [0, 20, 50, 35], ...
             'Callback', @(s,e) selectPrevSweep_());
         ui.nextSweepBtn = uicontrol(ui.sweepspanel, ...
             'Style', 'pushbutton', ...
             'Tooltip', 'Next Sweep', ...
             'String', '>', ...
             'Units', 'pixels', ...
-            'Position', [50, 20, 50, 50], ...
+            'Position', [50, 20, 50, 35], ...
             'Callback', @(s,e) selectNextSweep_());
         ui.selectedSweepsEdit = uicontrol(ui.sweepspanel, ...
             'Style', 'edit', ...
@@ -877,6 +915,94 @@ initUI_();
             'Units', 'pixels', ...
             'Position', [60, 0, 40, 20], ...
             'Callback', @(s,e) selectAllSweeps_());
+        
+        % buttons
+        ui.btnspanel = uipanel(ui.mainWindow, ...
+            'Units', 'pixels', ...
+            'Position', [0, 0, 100, 40]);
+        uicontrol(ui.btnspanel, ...
+            'Style', 'text', ...
+            'String', 'Autoscale', ...
+            'HorizontalAlignment', 'left', ...
+            'ForegroundColor', [0 0 1], ...
+            'Units', 'pixels', ...
+            'Position', [0, 25, 100, 15]);
+        uicontrol(ui.btnspanel, ...
+            'Style', 'pushbutton', ...
+            'Tooltip', 'Autoscale X', ...
+            'Units', 'pixels', ...
+            'Position', [0, 0, 25, 25], ...
+            'CData', imresize(ui.icons('autoscaleX'), [23,23]), ...
+            'Callback', @(s,e) autoscale_([], "x"));
+        uicontrol(ui.btnspanel, ...
+            'Style', 'pushbutton', ...
+            'Tooltip', 'Autoscale Y', ...
+            'Units', 'pixels', ...
+            'Position', [25, 0, 25, 25], ...
+            'CData', imresize(ui.icons('autoscaleY'), [23,23]), ...
+            'Callback', @(s,e) autoscale_([], "y"));
+        uicontrol(ui.btnspanel, ...
+            'Style', 'pushbutton', ...
+            'Tooltip', 'Autoscale Y Same', ...
+            'Units', 'pixels', ...
+            'Position', [50, 0, 25, 25], ...
+            'CData', imresize(ui.icons('autoscaleYSame'), [23,23]), ...
+            'Callback', @(s,e) autoscale_([], "y", true));
+        uicontrol(ui.btnspanel, ...
+            'Style', 'pushbutton', ...
+            'Tooltip', 'Autoscale XY', ...
+            'Units', 'pixels', ...
+            'Position', [75, 0, 25, 25], ...
+            'CData', imresize(ui.icons('autoscaleXY'), [23,23]), ...
+            'Callback', @(s,e) autoscale_([], "xy"));
+        
+        % toggle options
+        h = 18;
+        ui.optionspanel = uipanel(ui.mainWindow, ...
+            'Units', 'pixels', ...
+            'Position', [0, 0, 100, 3*h+15]);
+        uicontrol(ui.optionspanel, ...
+            'Style', 'text', ...
+            'String', 'Display Options', ...
+            'HorizontalAlignment', 'left', ...
+            'ForegroundColor', [0 0 1], ...
+            'Units', 'pixels', ...
+            'Position', [0, 3*h, 100, 15]);
+        ui.showRawBtn = uicontrol(ui.optionspanel, ...
+            'Style', 'togglebutton', ...
+            'String', 'Raw', ...
+            'Tooltip', 'Show Raw', ...
+            'Units', 'pixels', ...
+            'Position', [0, 2*h, 50, h], ...
+            'Callback', @(s,e) refresh_(true));
+        ui.showBaselineBtn = uicontrol(ui.optionspanel, ...
+            'Style', 'togglebutton', ...
+            'String', 'Baseline', ...
+            'Tooltip', 'Show Baseline', ...
+            'Units', 'pixels', ...
+            'Position', [50, 2*h, 50, h], ...
+            'Callback', @(s,e) refresh_());
+        ui.showMaskedBtn = uicontrol(ui.optionspanel, ...
+            'Style', 'togglebutton', ...
+            'String', 'Masked', ...
+            'Tooltip', 'Show Masked', ...
+            'Units', 'pixels', ...
+            'Position', [0, h, 50, h], ...
+            'Callback', @(s,e) refresh_());
+        ui.showAverageBtn = uicontrol(ui.optionspanel, ...
+            'Style', 'togglebutton', ...
+            'String', 'Average', ...
+            'Tooltip', 'Show Average', ...
+            'Units', 'pixels', ...
+            'Position', [50, h, 50, h], ...
+            'Callback', @(s,e) refresh_());
+        ui.showAverageOnlyBtn = uicontrol(ui.optionspanel, ...
+            'Style', 'togglebutton', ...
+            'String', 'Average ONLY', ...
+            'Tooltip', 'Show Average ONLY', ...
+            'Units', 'pixels', ...
+            'Position', [0, 0, 100, h], ...
+            'Callback', @(s,e) refresh_());
         
         ui.groups = repmat(struct(), [0,0]);
         
@@ -951,17 +1077,25 @@ initUI_();
         w = ui.mainWindow.Position(3);
         h = ui.mainWindow.Position(4);
         margin = 2;
+        sep = 2;
         
         x = margin;
         y = h-margin;
-        ui.visibleChannels.Position = [x, y-40, 100, 40];
-        y = y-40-margin;
-%         ui.viewControls.panel.Position = [5, y-70, 100, 70];
-%         y = y-70;
+        ui.channelspanel.Position(1) = x;
+        ui.channelspanel.Position(2) = y - ui.channelspanel.Position(4);
+        y = y-ui.channelspanel.Position(4)-sep;
+        
         ui.sweepspanel.Position(1) = x;
         ui.sweepspanel.Position(2) = y - ui.sweepspanel.Position(4);
-        y = y-ui.sweepspanel.Position(4)-margin;
-%         ui.btnControls.panel.Position = [5, y-100*5.0/3, 100, 100*5.0/3];
+        y = y-ui.sweepspanel.Position(4)-sep;
+        
+        ui.btnspanel.Position(1) = x;
+        ui.btnspanel.Position(2) = y - ui.btnspanel.Position(4);
+        y = y-ui.btnspanel.Position(4)-sep;
+        
+        ui.optionspanel.Position(1) = x;
+        ui.optionspanel.Position(2) = y - ui.optionspanel.Position(4);
+        y = y-ui.optionspanel.Position(4)-sep;
         
 %         btnsz = [100,100]./3.3;
 %         ui.btnControls.autoscaleXBtn.CData = imresize(ui.icons('autoscaleX'), btnsz);
@@ -1032,22 +1166,22 @@ initUI_();
                     if ~isempty(groupselsweeps)
                         rows = grouprows(groupselsweeps);
                         nrows = numel(rows);
-                        if ui.showRawBtn.Checked == "on" % show raw data
-                            if ui.showAverageOnlyBtn.Checked == "off" % show traces
+                        if showRaw_() % show raw data
+                            if ~showAverageOnly_() % show traces
                                 for k = 1:nrows
                                     trace = data.traces(rows(k),channel);
-                                    [x,y] = getXY_(trace, ui.showRawBtn.Checked == "on");
+                                    [x,y] = getXY_(trace, showRaw_());
                                     if ~trace.ismasked % not masked
                                         ax.UserData.traces = [ax.UserData.traces; ...
                                             plot(ax, x, y, 'color', cmap(1+mod(k-1,ncolors),:))];
                                         ax.UserData.rows = [ax.UserData.rows; rows(k)];
-                                    elseif ui.showMaskedBtn.Checked == "on" % show masked traces
+                                    elseif showMasked_() % show masked traces
                                         ax.UserData.traces = [ax.UserData.traces; ...
                                             plot(ax, x, y, 'color', [0.5, 0.5, 0.5])];
                                         ax.UserData.rows = [ax.UserData.rows; rows(k)];
                                     end
-                                    if ui.showBaselineBtn.Checked == "on" ... % show baseline
-                                            && (~trace.ismasked || ui.showMaskedBtn.Checked == "on")
+                                    if showBaseline_() ... % show baseline
+                                            && (~trace.ismasked || showMasked_())
                                         y0 = trace.y0;
                                         if numel(y0) == 1
                                             y0 = repmat(y0, size(y));
@@ -1057,33 +1191,31 @@ initUI_();
                                     end
                                 end
                             end
-                            if ui.showAverageBtn.Checked == "on" ...
-                                    || ui.showAverageOnlyBtn.Checked == "on" % show average
-                                [x,y] = getMeanXY_(data.traces(rows,channel), ui.showRawBtn.Checked == "on");
+                            if showAverage_() || showAverageOnly_() % show average
+                                [x,y] = getMeanXY_(data.traces(rows,channel), showRaw_());
                                 ax.UserData.avgtrace = plot(ax, x, y, 'k-');
                             end
                         else % show offset and scaled data
-                            if ui.showAverageOnlyBtn.Checked == "off" % show traces
+                            if ~showAverageOnly_() % show traces
                                 for k = 1:nrows
                                     trace = data.traces(rows(k),channel);
-                                    [x,y] = getXY_(trace, ui.showRawBtn.Checked == "on");
+                                    [x,y] = getXY_(trace, showRaw_());
                                     if ~trace.ismasked
                                         ax.UserData.traces = [ax.UserData.traces; ...
                                             plot(ax, x, y, 'color', cmap(1+mod(k-1,ncolors),:))];
                                         ax.UserData.rows = [ax.UserData.rows; rows(k)];
-                                    elseif ui.showMaskedBtn.Checked == "on" % show masked traces
+                                    elseif showMasked_() % show masked traces
                                         ax.UserData.traces = [ax.UserData.traces; ...
                                             plot(ax, x, y, 'color', [0.5, 0.5, 0.5])];
                                         ax.UserData.rows = [ax.UserData.rows; rows(k)];
                                     end
                                 end
                             end
-                            if ui.showAverageBtn.Checked == "on" ...
-                                    || ui.showAverageOnlyBtn.Checked == "on" % show average
-                                [x,y] = getMeanXY_(data.traces(rows,channel), ui.showRawBtn.Checked == "on");
+                            if showAverage_() || showAverageOnly_() % show average
+                                [x,y] = getMeanXY_(data.traces(rows,channel), showRaw_());
                                 ax.UserData.avgtrace = plot(ax, x, y, 'k-');
                             end
-                            if ui.showBaselineBtn.Checked == "on" % show baseline
+                            if showBaseline_() % show baseline
                                 plot(ax, ax.XLim', zeros([2,1]), 'k--');
                             end
                         end
@@ -1091,10 +1223,10 @@ initUI_();
                 else % refresh
                     for k = 1:numel(ax.UserData.traces)
                         trace = data.traces(ax.UserData.rows(k),channel);
-                        [x,y] = getXY_(trace, ui.showRawBtn.Checked == "on");
+                        [x,y] = getXY_(trace, showRaw_());
                         ax.UserData.traces(k).XData(:) = x;
                         ax.UserData.traces(k).YData(:) = y;
-                        if numel(ax.UserData.baselines) >= k && ui.showRawBtn.Checked == "on"
+                        if numel(ax.UserData.baselines) >= k && showRaw_()
                             y0 = trace.y0;
                             if numel(y0) == 1
                                 y0 = repmat(y0, size(y));
@@ -1104,7 +1236,7 @@ initUI_();
                         end
                     end
                     if ~isempty(ax.UserData.avgtrace)
-                        [x,y] = getMeanXY_(data.traces(ax.UserData.rows,channel), ui.showRawBtn.Checked == "on");
+                        [x,y] = getMeanXY_(data.traces(ax.UserData.rows,channel), showRaw_());
                         ax.UserData.avgtrace.XData(:) = x;
                         ax.UserData.avgtrace.YData(:) = y;
                     end
@@ -1113,16 +1245,21 @@ initUI_();
         end
     end
 
-    function refresh_()
+    function refresh_(autoscale)
+        if ~exist('autoscale', 'var'); autoscale = false; end
         redraw_(true);
+        if autoscale
+            autoscale_();
+        end
     end
 
     function loadIcons_()
         ui.icons = containers.Map();
         ui.icons('menu') = imread('icons/menu.png');
-%         ui.icons('autoscaleX') = imread('icons/autoscaleX.png');
-%         ui.icons('autoscaleY') = imread('icons/autoscaleY.png');
-%         ui.icons('autoscaleXY') = imread('icons/autoscaleXY.png');
+        ui.icons('autoscaleX') = imread('icons/autoscaleX.png');
+        ui.icons('autoscaleY') = imread('icons/autoscaleY.png');
+        ui.icons('autoscaleYSame') = imread('icons/autoscaleYSame.png');
+        ui.icons('autoscaleXY') = imread('icons/autoscaleXY.png');
 %         ui.icons('baselineFlat') = imread('icons/baselineFlat.png');
 %         ui.icons('baselineSloping') = imread('icons/baselineSloping.png');
 %         ui.icons('baselineSpline') = imread('icons/baselineSpline.png');
@@ -1151,14 +1288,14 @@ initUI_();
 
         uimenu(menu, ...
             'Separator', 'on', ...
-            'Text', 'Load HEKA Data', ...
+            'Text', 'Import HEKA Data File', ...
             'MenuSelectedFcn', @(s,e) loadHEKA_());
         uimenu(menu, ...
-            'Text', 'Load Axon ABF Data', ...
+            'Text', 'Import Axon ABF Data File', ...
             'MenuSelectedFcn', @(s,e) loadABF_());
-        uimenu(menu, ...
-            'Text', 'Load Axograph Data', ...
-            'MenuSelectedFcn', @(s,e) loadAxograph_());
+%         uimenu(menu, ...
+%             'Text', 'Import Axograph Data File', ...
+%             'MenuSelectedFcn', @(s,e) loadAxograph_());
 
         uimenu(menu, ...
             'Separator', 'on', ...
@@ -1185,36 +1322,38 @@ initUI_();
             'Text', 'Edit Group Labels', ...
             'MenuSelectedFcn', @(s,e) editGroupLabels_());
 
-        uimenu(menu, ...
-            'Separator', 'on', ...
-            'Label', 'Autoscale All XY', ...
-            'Callback', @(s,e) autoscale_([], "xy"));
-        uimenu(menu, ...
-            'Label', 'Autoscale All X', ...
-            'Callback', @(s,e) autoscale_([], "x"));
-        uimenu(menu, ...
-            'Label', 'Autoscale All Y', ...
-            'Callback', @(s,e) autoscale_([], "y"));
-        uimenu(menu, ...
-            'Label', 'Autoscale All Same Y', ...
-            'Callback', @(s,e) autoscale_([], "y", true));
+        % buttons are now available for these
+%         uimenu(menu, ...
+%             'Separator', 'on', ...
+%             'Label', 'Autoscale All XY', ...
+%             'Callback', @(s,e) autoscale_([], "xy"));
+%         uimenu(menu, ...
+%             'Label', 'Autoscale All X', ...
+%             'Callback', @(s,e) autoscale_([], "x"));
+%         uimenu(menu, ...
+%             'Label', 'Autoscale All Y', ...
+%             'Callback', @(s,e) autoscale_([], "y"));
+%         uimenu(menu, ...
+%             'Label', 'Autoscale All Same Y', ...
+%             'Callback', @(s,e) autoscale_([], "y", true));
 
-        ui.showRawBtn = uimenu(menu, ...
-            'Separator', 'on', ...
-            'Label', 'Show Raw', ...
-            'Callback', @toggleDisplayOptionBtn_);
-        ui.showBaselineBtn = uimenu(menu, ...
-            'Label', 'Show Baseline', ...
-            'Callback', @toggleDisplayOptionBtn_);
-        ui.showMaskedBtn = uimenu(menu, ...
-            'Label', 'Show Masked', ...
-            'Callback', @toggleDisplayOptionBtn_);
-        ui.showAverageBtn = uimenu(menu, ...
-            'Label', 'Show Average', ...
-            'Callback', @toggleDisplayOptionBtn_);
-        ui.showAverageOnlyBtn = uimenu(menu, ...
-            'Label', 'Show Average ONLY', ...
-            'Callback', @toggleDisplayOptionBtn_);
+        % buttons are now available for these
+%         ui.showRawBtn = uimenu(menu, ...
+%             'Separator', 'on', ...
+%             'Label', 'Show Raw', ...
+%             'Callback', @toggleDisplayOptionBtn_);
+%         ui.showBaselineBtn = uimenu(menu, ...
+%             'Label', 'Show Baseline', ...
+%             'Callback', @toggleDisplayOptionBtn_);
+%         ui.showMaskedBtn = uimenu(menu, ...
+%             'Label', 'Show Masked', ...
+%             'Callback', @toggleDisplayOptionBtn_);
+%         ui.showAverageBtn = uimenu(menu, ...
+%             'Label', 'Show Average', ...
+%             'Callback', @toggleDisplayOptionBtn_);
+%         ui.showAverageOnlyBtn = uimenu(menu, ...
+%             'Label', 'Show Average ONLY', ...
+%             'Callback', @toggleDisplayOptionBtn_);
     end
 
     function menu = createAxesMenu_(ax)
@@ -1303,7 +1442,7 @@ initUI_();
         ax.UserData.menu.Visible = 'on';
     end
 
-    function toggleDisplayOptionBtn_(btn, varargin)
+function UNUSED_toggleMenuDisplayOptionBtn_(btn, varargin)
         if btn.Checked == "on"
             btn.Checked = 'off';
         else
@@ -1509,6 +1648,12 @@ end
             nsweepsmax = max(nsweepsmax, numel(find(data.groupids == groupuids(i))));
         end
     end
+
+    function tf = showRaw_(); tf = ui.showRawBtn.Value; end
+    function tf = showBaseline_(); tf = ui.showBaselineBtn.Value; end
+    function tf = showMasked_(); tf = ui.showMaskedBtn.Value; end
+    function tf = showAverage_(); tf = ui.showAverageBtn.Value; end
+    function tf = showAverageOnly_(); tf = ui.showAverageOnlyBtn.Value; end
 
 %% sweep selection
 % Interface for traversing through sweeps.
