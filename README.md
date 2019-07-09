@@ -11,9 +11,11 @@ PatchMeister is...
 Copyright 2019 by Marcel Goldschen-Ohm <goldschen-ohm@utexas.edu>
 
 ### Install
-Everything is in patchmeister.m
+Most everything is in patchmeister.m
 
-Baseline spline fitting requires the [splinefit](https://www.mathworks.com/matlabcentral/fileexchange/71225-splinefit) package. Easiest option is to install it via MATLAB's Add-On Explorer.
+* Baseline spline fitting requires the [splinefit](https://www.mathworks.com/matlabcentral/fileexchange/71225-splinefit) package by Jonas Lundgren. Easiest option is to install it via MATLAB's Add-On Explorer.
+* Importing HEKA data files requires the [HEKA Patchmaster Importer](https://github.com/ChristianKeine/HEKA_Patchmaster_Importer) package by Christian Keine. Easiest option is to install it via MATLAB's Add-On Explorer.
+* Importing Axon ABF(2) data files requires the [fcollman/abfload](https://github.com/fcollman/abfload) package by Forrest Collman. Easiest option is to install it via MATLAB's Add-On Explorer (search for fcollman/abfload).
 
 Tested with MATLAB R2019a.
 
