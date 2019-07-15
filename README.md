@@ -49,3 +49,4 @@ Tested with MATLAB R2019a.
     * **Manually specify X and Y offsets and Y scale factor** - Set time zero (X offset), baseline (Y offset) and Y scale.
     * **Mask/Zero/Interpolate** - Mask, zero or interpolate selected segments of data points.
     * **Decimate** - Decimate displayed traces. Does NOT alter actual data.
+    * **Measure** - Measure basic stats (e.g. mean, std, var) or selected data.
