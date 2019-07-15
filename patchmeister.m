@@ -808,6 +808,35 @@ initUI_();
         end
     end
 
+    function measure_(ax)
+        if ~exist('ax', 'var') || isempty(ax)
+            ax = vertcat(ui.groups.ax);
+        end
+        israw = showRaw_();
+        values = [];
+        for i = 1:numel(ax)
+            for j = 1:numel(ax(i).UserData.traces)
+                brushdata = logical(ax(i).UserData.traces(j).BrushData);
+                if any(brushdata)
+                    row = ax(i).UserData.rows(j);
+                    channel = ax(i).UserData.channel;
+                    trace = data.traces(row,channel);
+                    [x,y] = getXY_(trace, israw);
+                    values = [values; y(brushdata)];
+                end
+            end
+        end
+        if ~isempty(values)
+            msgbox({['Mean: ' num2str(mean(values))]; ...
+                ['Std: ' num2str(std(values))]; ...
+                ['Var: ' num2str(var(values))]}, ...
+                'Measure');
+        else
+            msgbox('Select data to measure with the brush tool.', ...
+                'Measure');
+        end
+    end
+
     function setIsMaskedVisibleTraces_(ax, ismasked)
         if ~exist('ax', 'var') || isempty(ax)
             ax = vertcat(ui.groups.ax);
@@ -1482,6 +1511,11 @@ initUI_();
         uimenu(menu, ...
             'Label', 'Mask Selected Regions', ...
             'Callback', @(s,e) maskSelectedRegions_(ax));
+        
+        uimenu(menu, ...
+            'Separator', 'on', ...
+            'Label', 'Measure', ...
+            'Callback', @(s,e) measure_(ax));
         
         uimenu(menu, ...
             'Separator', 'on', ...
