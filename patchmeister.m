@@ -48,13 +48,13 @@ function patchmeister()
 
 % A time series trace of (x,y) data points is the basic fundamental unit
 % that we will deal with in this program.
-template.trace.x = []; % Tx1, e.g. time
-template.trace.y = []; % Tx1, e.g. current, voltage, etc.
+template.trace.x = []; % 1x1 sample interval OR Tx1 sample points, e.g. time
+template.trace.y = []; % Tx1 sample points, e.g. current, voltage, etc.
 % basic info about the (x,y) data
 template.trace.xlabel = "Time";
 template.trace.xunit = "s";
 template.trace.ylabel = ""; % e.g. "Current"
-template.trace.yunit = ""; % e.g. "pA"
+template.trace.yunit = ""; % e.g. "A"
 template.trace.timestamp = NaT; % timestamp for recorded data
 % basic offsets and scaling
 template.trace.x0 = 0; % 1x1 time zero offset
@@ -119,8 +119,14 @@ initUI_();
 % This provides a consistent interface to the data (see description above).
 
     function [x,y] = getXY_(trace, israw)
+        x = [];
+        y = [];
         % the trace's original raw (x,y) data
-        x = trace.x;
+        if numel(trace.x) == 1
+            x = reshape((0:length(trace.y)-1) .* trace.x, size(trace.y));
+        else
+            x = trace.x;
+        end
         y = trace.y;
         if exist('israw', 'var') && israw
             return;
