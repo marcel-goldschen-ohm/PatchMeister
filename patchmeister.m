@@ -1369,6 +1369,9 @@ initUI_();
         uimenu(menu, ...
             'Text', 'Show/Edit Notes', ...
             'MenuSelectedFcn', @(s,e) editNotes_());
+        uimenu(menu, ...
+            'Text', 'Edit Channels', ...
+            'MenuSelectedFcn', @(s,e) editChannels_());
         
         uimenu(menu, ...
             'Separator', 'on', ...
@@ -1943,6 +1946,43 @@ end
         if isfield(ui, 'notesEdit') && isvalid(ui.notesEdit)
             data.meta.notes = ui.notesEdit.String;
         end
+    end
+
+    function editChannels_()
+        labels = {};
+        channels = {};
+        units = {};
+        nchannels = getNumChannels_();
+        for i = 1:nchannels
+            labels{i} = ['Channel ' num2str(i)];
+            channels{i} = char(data.traces(1,i).ylabel);
+            units{i} = char(data.traces(1,i).yunit);
+        end
+        newchannels = inputdlg(labels, 'Channel Labels', 1, channels);
+        if isempty(newchannels); return; end
+        for i = 1:nchannels
+            [data.traces(:,i).ylabel] = deal(string(newchannels{i}));
+            labels{i} = [labels{i} ' -  ' newchannels{i}];
+        end
+        newunits = inputdlg(labels, 'Channel Units', 1, units);
+        if isempty(newunits); return; end
+        for i = 1:nchannels
+            if string(units{i}) ~= string(newunits{i})
+                [data.traces(:,i).yunit] = deal(string(newunits{i}));
+                scaleFactor = inputdlg( ...
+                    {['Scale factor for conversion from ' units{i} ' -> ' newunits{i}]}, ...
+                    'Unit Conversion Factor', 1, {'1'});
+                if ~isempty(scaleFactor)
+                    scaleFactor = str2num(scaleFactor{1});
+                    if scaleFactor ~= 1
+                        for row = 1:size(data.traces,1)
+                            data.traces(row,i).y = data.traces(row,i).y .* scaleFactor;
+                        end
+                    end
+                end
+            end
+        end
+        updateUI_();
     end
 
 function UNUSED_editTraces_()
