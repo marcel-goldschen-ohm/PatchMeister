@@ -83,7 +83,7 @@ template.series.meta.notes = '';
 % for debugging (comment out if you don't want command line access to the
 % data)
 global data;
-global ui;
+% global ui;
 
 % data for a single series of sweeps
 data = template.series;
@@ -176,10 +176,11 @@ initUI_();
     end
 
     function [x,y] = getOverlappingXY_(traces, israw)
-        % return [x, y1, y2,...] for region where all traces overlap
+        % return [x, [y1, y2,...]] for region where all traces overlap
         % !!! traces should all have the same sample interval
         x = [];
         y = [];
+        traces(vertcat(traces.ismasked)) = []; % remove masked traces
         if isempty(traces); return; end
         if ~exist('israw', 'var'); israw = false; end
         [x,y] = getXY_(traces(1), israw);
