@@ -826,7 +826,7 @@ initUI_();
                     values = [values; y(brushdata)];
                 end
             end
-            if isgraphics(ax(i).UserData.avgtrace) && ax(i).UserData.avgtrace.Visible == "on"
+            if ~isempty(ax(i).UserData.avgtrace) && ax(i).UserData.avgtrace.Visible == "on"
                 brushdata = logical(ax(i).UserData.avgtrace.BrushData);
                 if any(brushdata)
                     values = [values; ax(i).UserData.avgtrace.YData(brushdata)];
