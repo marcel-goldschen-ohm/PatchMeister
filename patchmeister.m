@@ -1713,6 +1713,8 @@ end
         elseif strcmp(key, 'rightarrow') disp('R');
         elseif strcmp(key, 'uparrow') disp('U');
         elseif strcmp(key, 'downarrow') disp('D');
+        elseif strcmp(key, 'm')
+            measure_();
         end
     end
 
