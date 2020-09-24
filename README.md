@@ -1,4 +1,5 @@
 # PatchMeister
+# !!! This has been superceded by [TimeSeriesAnalyzer](https://github.com/marcel-goldschen-ohm/TimeSeriesAnalyzer). Please use that instead.
 Electrophysiology patch-clamp time series analysis (NOT acquisition).
 
 PatchMeister is...
